@@ -1,0 +1,19 @@
+<configuration>
+    <appender name="stdout" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%date{ISO8601} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="stdout" />
+    </root>
+
+    <logger name="com.softwire" level="DEBUG"/>
+
+    <logger name="com.gargoylesoftware" level="INFO"/>
+    <logger name="org.eclipse.jetty" level="WARN"/>
+    <logger name="io.dropwizard" level="WARN"/>
+    <logger name="org.elasticsearch" level="WARN"/>
+    <logger name="liquibase" level="WARN"/>
+</configuration>
