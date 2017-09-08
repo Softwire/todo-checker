@@ -28,10 +28,12 @@ public class JiraCommenter {
     private final JiraClient jiraClient;
     private final Logger log = LoggerFactory.getLogger(getClass());
     private final Config config;
+    private final SourceControlLinkFormatter sourceControlLinkFormatter;
 
-    public JiraCommenter(Config config, JiraClient jiraClient) {
+    public JiraCommenter(Config config, JiraClient jiraClient, SourceControlLinkFormatter sourceControlLinkFormatter) {
         this.config = config;
         this.jiraClient = jiraClient;
+        this.sourceControlLinkFormatter = sourceControlLinkFormatter;
 
         commentSearchJql = "project = " + config.getJiraProjectKey()
                 + " AND comment ~ \"" + COMMENT_PREAMBLE + "\"";
@@ -100,7 +102,7 @@ public class JiraCommenter {
         String path = value.getFile().getPath().replace('\\', '/');
 
         return String.format(
-                " * {{[%s:%s|%s/blob/master/%s#L%s]}}",
+                " * {{[%s:%s|%s]}}",
                 path,
                 value.getLine()
                         .replace("|", "\\|")
@@ -108,9 +110,7 @@ public class JiraCommenter {
                         .replace("]", "\\]")
                         .replace("{", "\\{")
                         .replace("}", "\\}"),
-                config.getGithubUrl(),
-                path,
-                value.getLineNumber());
+                sourceControlLinkFormatter.build(path, value.getLineNumber()));
     }
 
     private static Comment findTodoComment(Issue issue) {
@@ -122,6 +122,5 @@ public class JiraCommenter {
 
     interface Config {
         String getJiraProjectKey();
-        String getGithubUrl();
     }
 }
