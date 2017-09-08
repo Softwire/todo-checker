@@ -46,17 +46,17 @@ public class TodoCheckerMain
     public String srcDir;
 
     @Option(name = "--jira-url",
-            usage = "The base url for jira with trailing slash e.g. https://jira.softwire.com/jira/",
-            required = true)
-    public String jiraUrl;
+            usage = "The base url for jira with trailing slash, defaults to https://jira.softwire.com/jira/",
+            required = false)
+    public String jiraUrl = "https://jira.softwire.com/jira/";
 
     @Option(name = "--jira-project-key",
-            usage = "The project key for JIRA, e.g. INTRO",
+            usage = "The project key for JIRA, e.g. AAA, INTRO, BBC, PROJECTX, etc",
             required = true)
     public String jiraProjectKey;
 
     @Option(name = "--jira-project-key-in-todo-regex",
-            usage = "A regex for project key as used in a todo, which doesn't necessarily need to match the jira key",
+            usage = "A regex for project key as used in a todo, which doesn't need to match the jira key",
             required = true)
     public String jiraProjectKeyInTodoRegex;
 
