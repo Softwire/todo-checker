@@ -45,13 +45,18 @@ public class TodoCheckerMain
             required = true)
     public String srcDir;
 
+    @Option(name = "--jira-url",
+            usage = "The base url for jira with trailing slash e.g. https://jira.softwire.com/jira/",
+            required = true)
+    public String jiraUrl;
+
     @Option(name = "--jira-project-key",
             usage = "The project key for JIRA, e.g. INTRO",
             required = true)
     public String jiraProjectKey;
 
     @Option(name = "--jira-project-key-in-todo-regex",
-            usage = "A regex for project key as used in a todo, e.g. bbcm(?:portal)",
+            usage = "A regex for project key as used in a todo, which doesn't necessarily need to match the jira key",
             required = true)
     public String jiraProjectKeyInTodoRegex;
 
@@ -71,7 +76,7 @@ public class TodoCheckerMain
     public String jiraPassword;
 
     @Option(name = "--exclude-path-regex",
-            usage = "Any paths to exclude, by regex, e.g. '^(infrastructure/|broken-code/)'",
+            usage = "Any paths to exclude, by regex, e.g. '^(node_modules/|broken-code/)'",
             required = false)
     public String excludePathRegex;
 
@@ -182,7 +187,6 @@ public class TodoCheckerMain
                 case "In Test":
                 case "Passed test":
                 case "UAT":
-                case "BBC UAT":
                 case "Done":
                     log.error("TODOs on a JIRA card with status '{}': {}",
                             issue.getStatus().getName(),
@@ -232,6 +236,11 @@ public class TodoCheckerMain
     @Override
     public String getGithubUrl() {
         return githubUrl;
+    }
+
+    @Override
+    public String getJiraUrl() {
+        return jiraUrl;
     }
 
     @Override

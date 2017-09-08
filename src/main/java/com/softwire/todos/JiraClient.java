@@ -44,7 +44,7 @@ public class JiraClient {
 
     public JiraClient(Config config) throws URISyntaxException {
         this.config = config;
-        URI serverUri = new URI("https://jira.softwire.com/jira/");
+        URI serverUri = new URI(config.getJiraUrl());
 
         restClient = new JerseyJiraRestClientFactory()
                 .createWithBasicHttpAuthentication(serverUri, config.getJiraUsername(), config.getJiraPassword());
@@ -172,6 +172,7 @@ public class JiraClient {
     public interface Config {
         String getRestrictToSingleCardId();
         boolean getWriteToJira();
+        String getJiraUrl();
         String getJiraUsername();
         String getJiraPassword();
     }
