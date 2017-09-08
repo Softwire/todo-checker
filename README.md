@@ -2,7 +2,7 @@
 
 This tool checks for TODOs and matches them to JIRA cards.
 
-Based entirely on @RichardBradley's various todo-checkers from various different Softwire projects.
+Based entirely on [@RichardBradley](https://github.com/richardbradley)'s various todo-checkers from various different Softwire projects.
 
 ### Workflow
 
