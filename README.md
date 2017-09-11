@@ -11,7 +11,7 @@ to an open Jira ticket. Tickets with open TODOs can't be closed, and TODOs witho
 cards can't be added.
 
 This is one way to ensure that all TODOs get done or are removed in a timely fashion,
-avoiding the problem of a codebase littered with many old and forgettin TODO comments.
+avoiding the problem of a codebase littered with many old and forgotten TODO comments.
 
 Setting up a Jenkins or other regular CI build that runs this tool will give your team the
 freedom to safely use TODOs to mark pending work directly in the codebase,
@@ -24,7 +24,7 @@ Running his tool will:
 1. Update the JIRA cards with a comment listing any code TODOs
 which are pending against that card.
 2. Exit with a failure status if there are any code TODOs against
-cards which are closed or in review.
+cards which are closed or in review, or TODOs with no card at all.
 
 ### How to use
 
