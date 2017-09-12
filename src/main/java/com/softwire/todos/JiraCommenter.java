@@ -20,23 +20,26 @@ import static com.google.common.base.Preconditions.checkArgument;
  */
 public class JiraCommenter {
 
-    private static final String COMMENT_PREAMBLE =
-            "Some TODOs in code comments reference this card.";
-
     private final String commentSearchJql;
+    private final String commentPreamble;
 
     private final JiraClient jiraClient;
     private final Logger log = LoggerFactory.getLogger(getClass());
-    private final Config config;
     private final SourceControlLinkFormatter sourceControlLinkFormatter;
 
     public JiraCommenter(Config config, JiraClient jiraClient, SourceControlLinkFormatter sourceControlLinkFormatter) {
-        this.config = config;
         this.jiraClient = jiraClient;
         this.sourceControlLinkFormatter = sourceControlLinkFormatter;
 
+        StringBuilder commentPreambleBuilder = new StringBuilder();
+        if (config.getJobName() != null) {
+            commentPreambleBuilder.append(config.getJobName()).append(" - ");
+        }
+        commentPreambleBuilder.append("Some TODOs in code comments reference this card.");
+        commentPreamble = commentPreambleBuilder.toString();
+
         commentSearchJql = "project = " + config.getJiraProjectKey()
-                + " AND comment ~ \"" + COMMENT_PREAMBLE + "\"";
+                + " AND comment ~ \"" + commentPreamble + "\"";
 
     }
 
@@ -92,7 +95,7 @@ public class JiraCommenter {
                 "%s\n" +
                         "Please ensure they get resolved before closing.\n\n" +
                         "%s",
-                COMMENT_PREAMBLE,
+                commentPreamble,
                 value.stream()
                     .map(this::commentText)
                     .collect(Collectors.joining("\n")));
@@ -113,14 +116,15 @@ public class JiraCommenter {
                 sourceControlLinkFormatter.build(path, value.getLineNumber()));
     }
 
-    private static Comment findTodoComment(Issue issue) {
+    private Comment findTodoComment(Issue issue) {
         return Iterables.tryFind(
                 issue.getComments(),
-                (Comment c) -> c.getBody().startsWith(COMMENT_PREAMBLE))
+                (Comment c) -> c.getBody().startsWith(commentPreamble))
                 .orNull();
     }
 
     interface Config {
         String getJiraProjectKey();
+        String getJobName();
     }
 }

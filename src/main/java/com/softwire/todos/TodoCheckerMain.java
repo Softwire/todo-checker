@@ -85,6 +85,11 @@ public class TodoCheckerMain
             required = false)
     public String excludePathRegex;
 
+    @Option(name = "--job-name",
+            usage = "Job name.  This will be prefixed to all JIRA comments.  You must set this to a unique value if " +
+                    "you have multiple jobs running against different codebases but with the same JIRA project, " +
+                    "otherwise the jobs will interfere with each other.")
+    public String jobName = null;
     /// End config
 
     private JiraClient jiraClient;
@@ -224,6 +229,11 @@ public class TodoCheckerMain
                     codeTodo.getLine());
         }
         return false;
+    }
+
+    @Override
+    public String getJobName() {
+        return jobName;
     }
 
     @Override
