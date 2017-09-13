@@ -25,7 +25,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  * CLI entry point to the `TodoChecker` tool.
  */
 public class TodoCheckerMain
-        implements JiraClient.Config, JiraCommenter.Config {
+        implements JiraClient.Config, JiraCommenter.Config, SourceControlLinkFormatter.Config {
 
     /// Command-line arguments
 
@@ -62,8 +62,13 @@ public class TodoCheckerMain
 
     @Option(name = "--github-url",
             usage = "The url of the project in github, e.g. https://github.com/softwire/todo-checker",
-            required = true)
+            forbids = "--gitblit-url")
     public String githubUrl;
+
+    @Option(name = "--gitblit-url",
+            usage = "The url of the project in gitblit, e.g. https://example.com/gitblit?r=todo-checker.git",
+            forbids = "--github-url")
+    public String gitblitUrl;
 
     @Option(name = "--jira-username",
             usage = "The username of the Jira user who will comment on Jira tickets, e.g. sjw",
@@ -125,7 +130,10 @@ public class TodoCheckerMain
 
         Multimap<Issue, CodeTodo> todosByIssue = groupTodosByJiraIssue(allTodos);
 
-        new JiraCommenter(this, jiraClient).updateJiraComments(todosByIssue);
+        new JiraCommenter(
+                this,
+                jiraClient,
+                new SourceControlLinkFormatter(this)).updateJiraComments(todosByIssue);
 
         success &= findTodosOnClosedCards(todosByIssue);
 
@@ -241,6 +249,11 @@ public class TodoCheckerMain
     @Override
     public String getJiraUrl() {
         return jiraUrl;
+    }
+
+    @Override
+    public String getGitblitUrl() {
+        return gitblitUrl;
     }
 
     @Override
