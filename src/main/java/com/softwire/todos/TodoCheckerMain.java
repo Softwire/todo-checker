@@ -13,6 +13,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -90,10 +93,15 @@ public class TodoCheckerMain
                     "you have multiple jobs running against different codebases but with the same JIRA project, " +
                     "otherwise the jobs will interfere with each other.")
     public String jobName = null;
+
+    @Option(name = "--report-file",
+            usage = "Write report of errors to this file as well as to the console.")
+    public String reportFile = null;
     /// End config
 
     private JiraClient jiraClient;
     private final Logger log = LoggerFactory.getLogger(getClass());
+    private final StringBuilder errorReport = new StringBuilder();
 
     public TodoCheckerMain() throws URISyntaxException {
     }
@@ -139,8 +147,11 @@ public class TodoCheckerMain
                 new SourceControlLinkFormatter(this)).updateJiraComments(todosByIssue);
 
         boolean success = findTodosOnClosedCards(todosByIssue);
-
         success &= findTodosWithoutACardNumber(todosByIssue);
+
+        if (reportFile != null) {
+            Files.write(Paths.get(reportFile), errorReport.toString().getBytes(StandardCharsets.UTF_8));
+        }
 
         return success;
     }
@@ -194,11 +205,11 @@ public class TodoCheckerMain
 
             BasicResolution resolution = issue.getResolution();
             if (resolution != null) {
-                log.error("TODOs on a resolved '{}' JIRA card found {}",
+                logAndReportError("TODOs on a resolved '%s' JIRA card found %s",
                         resolution.getName(),
                         issue.getKey());
                 for (CodeTodo codeTodo : entry.getValue()) {
-                    log.error("  {}:{} {}",
+                    logAndReportError("  %s:%s %s",
                             codeTodo.getFile(),
                             codeTodo.getLineNumber(),
                             codeTodo.getLine());
@@ -211,11 +222,11 @@ public class TodoCheckerMain
                 case "Passed test":
                 case "UAT":
                 case "Done":
-                    log.error("TODOs on a JIRA card with status '{}': {}",
+                    logAndReportError("TODOs on a JIRA card with status '%s': %s",
                             issue.getStatus().getName(),
                             issue.getKey());
                     for (CodeTodo codeTodo : entry.getValue()) {
-                        log.error("  {}:{} {}",
+                        logAndReportError("  %s:%s %s",
                                 codeTodo.getFile(),
                                 codeTodo.getLineNumber(),
                                 codeTodo.getLine());
@@ -231,14 +242,20 @@ public class TodoCheckerMain
         if (codeTodos.isEmpty()) {
             return true;
         }
-        log.error("TODOs without a JIRA card found:");
+        logAndReportError("TODOs without a JIRA card found:");
         for (CodeTodo codeTodo : codeTodos) {
-            log.error("  {}:{} {}",
+            logAndReportError("  %s:%s %s",
                     codeTodo.getFile(),
                     codeTodo.getLineNumber(),
                     codeTodo.getLine());
         }
         return false;
+    }
+
+    private void logAndReportError(String formatString, Object ...args) {
+        String error = String.format(formatString, args);
+        log.error(error);
+        errorReport.append(error).append('\n');
     }
 
     @Override
