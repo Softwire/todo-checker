@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -50,15 +51,14 @@ public class TodoCheckerMain
             required = false)
     public String jiraUrl = "https://jira.softwire.com/jira/";
 
-    @Option(name = "--jira-project-key",
-            usage = "The project key for JIRA, e.g. AAA, INTRO, BBC, PROJECTX, etc",
-            required = true)
-    public String jiraProjectKey;
-
-    @Option(name = "--jira-project-key-in-todo-regex",
-            usage = "A regex for project key as used in a todo, which doesn't need to match the jira key",
-            required = true)
-    public String jiraProjectKeyInTodoRegex;
+    @Option(name = "--jira-project",
+            usage = "The project key for JIRA, e.g. AAA, INTRO, PROJECTX, etc.  Pass this flag multiple times for " +
+                    "multiple projects.  If you want to use a regex for the project key as used in a todo, for " +
+                    "example if your JIRA project is FOO but in TODOs it appears as BAR, then pass " +
+                    "--jira-project FOO=BAR",
+            required = true,
+            handler = JiraProjectOptionHandler.class)
+    public List<JiraProject> jiraProjects;
 
     @Option(name = "--github-url",
             usage = "The url of the project in github, e.g. https://github.com/softwire/todo-checker",
@@ -117,8 +117,6 @@ public class TodoCheckerMain
     private boolean run() throws Exception {
         this.jiraClient = new JiraClient(this);
 
-        boolean success = true;
-
         if (!writeToJira) {
             log.info("This script will not write to JIRA unless you pass '--write-to-jira' " +
                     "as a command-line argument");
@@ -140,7 +138,7 @@ public class TodoCheckerMain
                 jiraClient,
                 new SourceControlLinkFormatter(this)).updateJiraComments(todosByIssue);
 
-        success &= findTodosOnClosedCards(todosByIssue);
+        boolean success = findTodosOnClosedCards(todosByIssue);
 
         success &= findTodosWithoutACardNumber(todosByIssue);
 
@@ -153,13 +151,25 @@ public class TodoCheckerMain
      */
     private Multimap<Issue, CodeTodo> groupTodosByJiraIssue(List<CodeTodo> allTodos) throws Exception {
         HashMultimap<Issue, CodeTodo> acc = HashMultimap.create();
-        Pattern cardNumberPat = Pattern.compile(
-                jiraProjectKeyInTodoRegex + "[-_:]([0-9]+)",
-                Pattern.CASE_INSENSITIVE);
+
+        List<Pattern> jiraProjectPatterns = new ArrayList<Pattern>();
+        for (JiraProject jiraProject: jiraProjects) {
+            jiraProjectPatterns.add(Pattern.compile(
+                    jiraProject.getRegex() + "[-_:]([0-9]+)",
+                    Pattern.CASE_INSENSITIVE));
+        }
+
         for (CodeTodo codeTodo : allTodos) {
-            Matcher matcher = cardNumberPat.matcher(codeTodo.getLine());
-            if (matcher.find()) {
-                String id = jiraProjectKey + "-" + matcher.group(1);
+            String id = null;
+            for (int i = 0; i < jiraProjects.size(); i++) {
+                Matcher matcher = jiraProjectPatterns.get(i).matcher(codeTodo.getLine());
+                if (matcher.find()) {
+                    id = jiraProjects.get(i).getKey() + "-" + matcher.group(1);
+                    break;
+                }
+            }
+
+            if (id != null) {
                 if (null == restrictToSingleCardId || id.equals(restrictToSingleCardId)) {
                     Issue issue = jiraClient.getIssue(id);
                     acc.put(issue, codeTodo);
@@ -247,8 +257,8 @@ public class TodoCheckerMain
     }
 
     @Override
-    public String getJiraProjectKey() {
-        return jiraProjectKey;
+    public List<JiraProject> getJiraProjects() {
+        return jiraProjects;
     }
 
     @Override
