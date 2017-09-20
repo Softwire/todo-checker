@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -38,9 +39,11 @@ public class JiraCommenter {
         commentPreambleBuilder.append("Some TODOs in code comments reference this card.");
         commentPreamble = commentPreambleBuilder.toString();
 
-        commentSearchJql = "project = " + config.getJiraProjectKey()
-                + " AND comment ~ \"" + commentPreamble + "\"";
+        String projects = config.getJiraProjects().stream()
+                .map(jiraProject -> "project = " + jiraProject.getKey())
+                .collect(Collectors.joining(" OR "));
 
+        commentSearchJql = String.format("(%s) AND comment ~ \"%s\"", projects, commentPreamble);
     }
 
     /**
@@ -124,7 +127,7 @@ public class JiraCommenter {
     }
 
     interface Config {
-        String getJiraProjectKey();
+        List<JiraProject> getJiraProjects();
         String getJobName();
     }
 }

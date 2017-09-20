@@ -34,9 +34,8 @@ To run execute:
   sbt run \
     --src ../ppc-manager \
     --jira-url https://jira.softwire.com/jira/
-    --jira-project-key AAA \
+    --jira-project AAA \
     --github-url https://github.com/softwire/todo-checker \
-    --jira-project-key-in-todo-regex aaa \
     --jira-username Jenkins \
     --jira-password *****
 ```
