@@ -54,11 +54,12 @@ public class TodoCheckerMain
             required = false)
     public String jiraUrl = "https://jira.softwire.com/jira/";
 
-    @Option(name = "--jira-project",
+    @Option(name = "--jira-project-key",
             usage = "The project key for JIRA, e.g. AAA, INTRO, PROJECTX, etc.  Pass this flag multiple times for " +
-                    "multiple projects.  If you want to use a regex for the project key as used in a todo, for " +
-                    "example if your JIRA project is FOO but in TODOs it appears as BAR, then pass " +
-                    "--jira-project FOO=BAR",
+                    "multiple projects.  If you need to use a regex other than the project key when looking for the " +
+                    "card key in a todo comment, then pass it here with an \"=\". For example if your JIRA project " +
+                    "key is something long like COMPANY-DEPT-FOO but your team writes TODOs like " +
+                    "\"TODO:FOO-123\", then pass \"--jira-project COMPANY-DEPT-FOO=FOO\"",
             required = true,
             handler = JiraProjectOptionHandler.class)
     public List<JiraProject> jiraProjects;
