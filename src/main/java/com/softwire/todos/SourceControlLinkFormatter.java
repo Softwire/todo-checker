@@ -15,9 +15,9 @@ public class SourceControlLinkFormatter {
             linkFormatter = this::githubFormatter;
         } else if (config.getGithubUrl() != null) {
             baseUrl = config.getGithubUrl();
-            linkFormatter = this::gitblitFormatter;
+            linkFormatter = this::githubFormatter;
         } else {
-            throw new ConfigException("Exactly one of --gitblit-url or --gitblit-url must be specified");
+            throw new ConfigException("Exactly one of --github-url or --gitblit-url must be specified");
         }
     }
 
