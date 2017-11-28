@@ -12,7 +12,7 @@ public class SourceControlLinkFormatter {
     public SourceControlLinkFormatter(Config config) throws ConfigException {
         if (config.getGitblitUrl() != null) {
             baseUrl = config.getGitblitUrl();
-            linkFormatter = this::githubFormatter;
+            linkFormatter = this::gitblitFormatter;
         } else if (config.getGithubUrl() != null) {
             baseUrl = config.getGithubUrl();
             linkFormatter = this::githubFormatter;
