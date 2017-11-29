@@ -1,5 +1,7 @@
 # todo-checker
 
+[![Build Status](https://travis-ci.org/softwire/todo-checker.svg?branch=master)](https://travis-ci.org/softwire/todo-checker)
+
 This tool checks for TODOs and matches them to JIRA cards.
 
 Based entirely on [@RichardBradley](https://github.com/richardbradley)'s various todo-checkers from various different Softwire projects.
