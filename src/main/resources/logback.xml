@@ -9,7 +9,7 @@
         <appender-ref ref="stdout" />
     </root>
 
-    <logger name="com.softwire" level="DEBUG"/>
+    <logger name="com.softwire" level="INFO"/>
 
     <logger name="com.gargoylesoftware" level="INFO"/>
     <logger name="org.eclipse.jetty" level="WARN"/>

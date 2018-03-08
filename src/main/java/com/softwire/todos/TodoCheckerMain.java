@@ -139,9 +139,8 @@ public class TodoCheckerMain
 
         List<CodeTodo> allTodos = new TodoFinder(srcDirFile).findAllTodosInSource(this.excludePathRegex);
 
-        log.info("{} code TODOs found:\n{}",
-                allTodos.size(),
-                Joiner.on("\n").join(allTodos));
+        log.info("{} code TODOs found", allTodos.size());
+        log.debug(Joiner.on("\n").join(allTodos));
 
         Multimap<Issue, CodeTodo> todosByIssue = groupTodosByJiraIssue(allTodos);
 
@@ -150,7 +149,7 @@ public class TodoCheckerMain
                 jiraClient,
                 new SourceControlLinkFormatter(this)).updateJiraComments(todosByIssue);
 
-        boolean success = findTodosOnClosedCards(todosByIssue);
+        boolean success = findTodosOnClosedCards(todosByIssue, jiraClient);
         success &= findTodosWithoutACardNumber(todosByIssue);
 
         if (reportFile != null) {
@@ -201,7 +200,11 @@ public class TodoCheckerMain
         return acc;
     }
 
-    private boolean findTodosOnClosedCards(Multimap<Issue, CodeTodo> todosByIssue) {
+    private boolean findTodosOnClosedCards(
+        Multimap<Issue, CodeTodo> todosByIssue,
+        JiraClient jiraClient)
+            throws Exception {
+
         boolean ok = true;
         for (Map.Entry<Issue, Collection<CodeTodo>> entry : todosByIssue.asMap().entrySet()) {
             Issue issue = entry.getKey();
@@ -213,7 +216,7 @@ public class TodoCheckerMain
             if (resolution != null) {
                 logAndReportError("TODOs on a resolved '%s' JIRA card found %s",
                         resolution.getName(),
-                        issue.getKey());
+                        jiraClient.getViewUrl(issue));
                 for (CodeTodo codeTodo : entry.getValue()) {
                     logAndReportError("  %s:%s %s",
                             codeTodo.getFile(),
@@ -230,7 +233,7 @@ public class TodoCheckerMain
                 case "Done":
                     logAndReportError("TODOs on a JIRA card with status '%s': %s",
                             issue.getStatus().getName(),
-                            issue.getKey());
+                            jiraClient.getViewUrl(issue));
                     for (CodeTodo codeTodo : entry.getValue()) {
                         logAndReportError("  %s:%s %s",
                                 codeTodo.getFile(),

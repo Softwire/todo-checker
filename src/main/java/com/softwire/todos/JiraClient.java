@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.core.UriBuilder;
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URI;
@@ -57,7 +58,7 @@ public class JiraClient {
 
         Issue cached = issuesByKey.get(key);
         if (cached == null) {
-            log.info("Fetching card info for {}", key);
+            log.debug("Fetching card info for {}", key);
             cached = restClient.getIssueClient().getIssue(key, null);
             issuesByKey.put(key, cached);
         }
@@ -134,6 +135,10 @@ public class JiraClient {
             }
         }
         return issues;
+    }
+
+    public String getViewUrl(Issue issue) throws Exception {
+        return new URI(config.getJiraUrl()).resolve("browse/" + issue.getKey()).toString();
     }
 
     private SearchResult getAndParse(
