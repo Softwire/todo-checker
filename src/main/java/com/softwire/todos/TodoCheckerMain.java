@@ -24,6 +24,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * CLI entry point to the `TodoChecker` tool.
@@ -59,13 +60,15 @@ public class TodoCheckerMain
                     "multiple projects.  If you need to use a regex other than the project key when looking for the " +
                     "card key in a todo comment, then pass it here with an \"=\". For example if your JIRA project " +
                     "key is something long like COMPANY-DEPT-FOO but your team writes TODOs like " +
-                    "\"TODO:FOO-123\", then pass \"--jira-project COMPANY-DEPT-FOO=FOO\"",
+                    "\"TODO:FOO-123\", then pass \"--jira-project COMPANY-DEPT-FOO=FOO\"\n" +
+                    "You can also use a regex, e.g. \"--jira-project COMPANY-DEPT-FOO=FOO|DEPT-FOO\"",
             required = true,
             handler = JiraProjectOptionHandler.class)
     public List<JiraProject> jiraProjects;
 
     @Option(name = "--github-url",
-            usage = "The url of the project in github, e.g. https://github.com/softwire/todo-checker",
+            usage = "The url of the project in github, e.g. https://github.com/softwire/todo-checker" +
+                "\nGitLab uses the same URL format, so use this arg if you use GitLab.",
             forbids = "--gitblit-url")
     public String githubUrl;
 
@@ -167,7 +170,7 @@ public class TodoCheckerMain
         List<Pattern> jiraProjectPatterns = new ArrayList<Pattern>();
         for (JiraProject jiraProject: jiraProjects) {
             jiraProjectPatterns.add(Pattern.compile(
-                    jiraProject.getRegex() + "[-_:]([0-9]+)",
+                    "(" + jiraProject.getRegex() + ")[-_:](?<id>[0-9]+)",
                     Pattern.CASE_INSENSITIVE));
         }
 
@@ -176,7 +179,9 @@ public class TodoCheckerMain
             for (int i = 0; i < jiraProjects.size(); i++) {
                 Matcher matcher = jiraProjectPatterns.get(i).matcher(codeTodo.getLine());
                 if (matcher.find()) {
-                    id = jiraProjects.get(i).getKey() + "-" + matcher.group(1);
+                    String idGroup = matcher.group("id");
+                    checkNotNull(idGroup);
+                    id = jiraProjects.get(i).getKey() + "-" + idGroup;
                     break;
                 }
             }
