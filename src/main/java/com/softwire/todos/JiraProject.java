@@ -1,5 +1,7 @@
 package com.softwire.todos;
 
+import java.util.regex.Pattern;
+
 public class JiraProject {
     private final String key;
     private final String regex;
@@ -15,5 +17,11 @@ public class JiraProject {
 
     public String getRegex() {
         return regex;
+    }
+
+    Pattern getIssueIdPattern() {
+        return Pattern.compile(
+            "(" + getRegex() + ")[-_:](?<id>[0-9]+)",
+            Pattern.CASE_INSENSITIVE);
     }
 }

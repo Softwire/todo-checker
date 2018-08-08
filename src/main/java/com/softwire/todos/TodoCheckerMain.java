@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -65,6 +66,14 @@ public class TodoCheckerMain
             required = true,
             handler = JiraProjectOptionHandler.class)
     public List<JiraProject> jiraProjects;
+
+    @Option(name = "--ignore-jira-project-key",
+        usage = "A JIRA project key to ignore, e.g. AAA, INTRO, PROJECTX, etc. Pass this flag multiple times for " +
+            "multiple projects. You can use this if your project uses multiple JIRA instances. Any TODOs which " +
+            "reference this JIRA project will not count as untracked TODOs, but no JIRA comments will be updated " +
+            "for them.",
+        handler = JiraProjectOptionHandler.class)
+    public List<JiraProject> ignoredJiraProjects;
 
     @Option(name = "--github-url",
             usage = "The url of the project in github, e.g. https://github.com/softwire/todo-checker" +
@@ -161,20 +170,25 @@ public class TodoCheckerMain
 
     /**
      * Sort the list into a multimap from JiraCard to CodeTodos.
+     *
      * Any CodeTodos with no card will be included at the "null" key.
+     *
+     * Any CodeTodos against ignored projects will not be returned
      */
     private Multimap<Issue, CodeTodo> groupTodosByJiraIssue(List<CodeTodo> allTodos) throws Exception {
         HashMultimap<Issue, CodeTodo> acc = HashMultimap.create();
 
-        List<Pattern> jiraProjectPatterns = new ArrayList<Pattern>();
-        for (JiraProject jiraProject: jiraProjects) {
-            jiraProjectPatterns.add(Pattern.compile(
-                    "(" + jiraProject.getRegex() + ")[-_:](?<id>[0-9]+)",
-                    Pattern.CASE_INSENSITIVE));
-        }
+        List<Pattern> jiraProjectPatterns = jiraProjects.stream()
+            .map(JiraProject::getIssueIdPattern)
+            .collect(Collectors.toList());
+        List<Pattern> ignoredJiraProjectPatterns = ignoredJiraProjects.stream()
+            .map(JiraProject::getIssueIdPattern)
+            .collect(Collectors.toList());
 
+        outer:
         for (CodeTodo codeTodo : allTodos) {
             String id = null;
+            // Check if the item matches a jira project
             for (int i = 0; i < jiraProjects.size(); i++) {
                 Matcher matcher = jiraProjectPatterns.get(i).matcher(codeTodo.getLine());
                 if (matcher.find()) {
@@ -184,7 +198,18 @@ public class TodoCheckerMain
                     break;
                 }
             }
+            // Else check if it matches an ignored jira project
+            if (id == null) {
+                for (Pattern pattern : ignoredJiraProjectPatterns) {
+                    Matcher matcher = pattern.matcher(codeTodo.getLine());
+                    if (matcher.find()) {
+                        log.debug("Ignoring code TODO against {}: {}", matcher.group(), codeTodo);
+                        continue outer;
+                    }
+                }
+            }
 
+            // Now add it to the multimap
             if (id != null) {
                 if (null == restrictToSingleCardId || id.equals(restrictToSingleCardId)) {
                     Issue issue = jiraClient.getIssue(id);
