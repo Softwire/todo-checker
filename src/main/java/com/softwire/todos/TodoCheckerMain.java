@@ -65,7 +65,7 @@ public class TodoCheckerMain
                     "You can also use a regex, e.g. \"--jira-project COMPANY-DEPT-FOO=FOO|DEPT-FOO\"",
             required = true,
             handler = JiraProjectOptionHandler.class)
-    public List<JiraProject> jiraProjects;
+    public List<JiraProject> jiraProjects = new ArrayList<>();
 
     @Option(name = "--ignore-jira-project-key",
         usage = "A JIRA project key to ignore, e.g. AAA, INTRO, PROJECTX, etc. Pass this flag multiple times for " +
@@ -73,7 +73,7 @@ public class TodoCheckerMain
             "reference this JIRA project will not count as untracked TODOs, but no JIRA comments will be updated " +
             "for them.",
         handler = JiraProjectOptionHandler.class)
-    public List<JiraProject> ignoredJiraProjects;
+    public List<JiraProject> ignoredJiraProjects = new ArrayList<>();
 
     @Option(name = "--github-url",
             usage = "The url of the project in github, e.g. https://github.com/softwire/todo-checker" +
