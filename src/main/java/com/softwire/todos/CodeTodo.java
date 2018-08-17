@@ -3,15 +3,17 @@ package com.softwire.todos;
 import java.io.File;
 
 class CodeTodo {
-    private File file;
-    private int lineNumber;
-    private String line;
+    private final File file;
+    private final int lineNumber;
+    private final String line;
+    private final GitCheckout containingGitCheckout;
 
     @java.beans.ConstructorProperties({"file", "lineNumber", "line"})
-    public CodeTodo(File file, int lineNumber, String line) {
+    public CodeTodo(File file, int lineNumber, String line, GitCheckout containingGitCheckout) {
         this.file = file;
         this.lineNumber = lineNumber;
         this.line = line;
+        this.containingGitCheckout = containingGitCheckout;
     }
 
     public File getFile() {
@@ -24,6 +26,10 @@ class CodeTodo {
 
     public String getLine() {
         return this.line;
+    }
+
+    public GitCheckout getContainingGitCheckout() {
+        return containingGitCheckout;
     }
 
     public boolean equals(Object o) {

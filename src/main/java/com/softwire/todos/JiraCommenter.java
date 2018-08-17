@@ -26,11 +26,9 @@ public class JiraCommenter {
 
     private final JiraClient jiraClient;
     private final Logger log = LoggerFactory.getLogger(getClass());
-    private final SourceControlLinkFormatter sourceControlLinkFormatter;
 
-    public JiraCommenter(Config config, JiraClient jiraClient, SourceControlLinkFormatter sourceControlLinkFormatter) {
+    public JiraCommenter(Config config, JiraClient jiraClient) {
         this.jiraClient = jiraClient;
-        this.sourceControlLinkFormatter = sourceControlLinkFormatter;
 
         StringBuilder commentPreambleBuilder = new StringBuilder();
         if (config.getJobName() != null) {
@@ -107,6 +105,8 @@ public class JiraCommenter {
     private String commentText(CodeTodo value) {
         String path = value.getFile().getPath().replace('\\', '/');
 
+        // See https://getsupport.atlassian.com/servicedesk/customer/portal/23/JST-408644
+        // this doesn't link properly on new Cloud Jira...
         return String.format(
                 " * {{[%s:%s|%s]}}",
                 path,
@@ -116,7 +116,9 @@ public class JiraCommenter {
                         .replace("]", "\\]")
                         .replace("{", "\\{")
                         .replace("}", "\\}"),
-                sourceControlLinkFormatter.build(path, value.getLineNumber()));
+                value.getContainingGitCheckout()
+                        .getSourceControlLinkFormatter()
+                        .build(path, value.getLineNumber()));
     }
 
     private Comment findTodoComment(Issue issue) {
@@ -128,6 +130,7 @@ public class JiraCommenter {
 
     interface Config {
         List<JiraProject> getJiraProjects();
+
         String getJobName();
     }
 }

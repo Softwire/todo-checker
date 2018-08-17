@@ -31,7 +31,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * CLI entry point to the `TodoChecker` tool.
  */
 public class TodoCheckerMain
-        implements JiraClient.Config, JiraCommenter.Config, SourceControlLinkFormatter.Config {
+        implements JiraClient.Config, JiraCommenter.Config, GitCheckout.Config {
 
     /// Command-line arguments
 
@@ -47,9 +47,10 @@ public class TodoCheckerMain
     public String restrictToSingleCardId = null;
 
     @Option(name = "--src",
-            usage = "The directory to scan for TODOs (must be in a git checkout)",
+            usage = "The directory to scan for TODOs (must be in a git checkout). " +
+                    "Pass this arg multiple times for multiple projects.",
             required = true)
-    public String srcDir;
+    public List<String> srcDirs;
 
     @Option(name = "--jira-url",
             usage = "The base url for jira with trailing slash, defaults to https://jira.softwire.com/jira/",
@@ -68,16 +69,17 @@ public class TodoCheckerMain
     public List<JiraProject> jiraProjects = new ArrayList<>();
 
     @Option(name = "--ignore-jira-project-key",
-        usage = "A JIRA project key to ignore, e.g. AAA, INTRO, PROJECTX, etc. Pass this flag multiple times for " +
-            "multiple projects. You can use this if your project uses multiple JIRA instances. Any TODOs which " +
-            "reference this JIRA project will not count as untracked TODOs, but no JIRA comments will be updated " +
-            "for them.",
-        handler = JiraProjectOptionHandler.class)
+            usage = "A JIRA project key to ignore, e.g. AAA, INTRO, PROJECTX, etc. Pass this flag multiple times for " +
+                    "multiple projects. You can use this if your project uses multiple JIRA instances. Any TODOs which " +
+                    "reference this JIRA project will not count as untracked TODOs, but no JIRA comments will be updated " +
+                    "for them.",
+            handler = JiraProjectOptionHandler.class)
     public List<JiraProject> ignoredJiraProjects = new ArrayList<>();
 
     @Option(name = "--github-url",
-            usage = "The url of the project in github, e.g. https://github.com/softwire/todo-checker" +
-                "\nGitLab uses the same URL format, so use this arg if you use GitLab.",
+            usage = "OPTIONAL (omit this to auto-detect, especially if you are scanning multiple checkouts)." +
+                    "\nThe url of the project in github, e.g. https://github.com/softwire/todo-checker" +
+                    "\nGitLab uses the same URL format, so use this arg if you use GitLab.",
             forbids = "--gitblit-url")
     public String githubUrl;
 
@@ -140,23 +142,33 @@ public class TodoCheckerMain
 
         if (!writeToJira) {
             log.info("This script will not write to JIRA unless you pass '--write-to-jira' " +
-                    "as a command-line argument");
+                     "as a command-line argument");
         }
 
-        File srcDirFile = new File(this.srcDir);
-        checkArgument(srcDirFile.isDirectory(), "Invalid --src argument");
+        List<CodeTodo> allTodos = this.srcDirs.stream()
+            .flatMap(srcDir -> {
+                try {
+                    File srcDirFile = new File(srcDir);
+                    checkArgument(srcDirFile.isDirectory(), "Invalid --src argument: " + srcDir);
+                    log.info("Scanning {}", srcDirFile.getAbsolutePath());
+                    GitCheckout gitCheckout = new GitCheckout(srcDirFile, this);
 
-        List<CodeTodo> allTodos = new TodoFinder(srcDirFile).findAllTodosInSource(this.excludePathRegex);
+                    return new TodoFinder(gitCheckout)
+                        .findAllTodosInSource(this.excludePathRegex)
+                        .stream();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            })
+            .collect(Collectors.toList());
 
         log.info("{} code TODOs found", allTodos.size());
         log.debug(Joiner.on("\n").join(allTodos));
 
         Multimap<Issue, CodeTodo> todosByIssue = groupTodosByJiraIssue(allTodos);
 
-        new JiraCommenter(
-                this,
-                jiraClient,
-                new SourceControlLinkFormatter(this)).updateJiraComments(todosByIssue);
+        new JiraCommenter(this, jiraClient)
+            .updateJiraComments(todosByIssue);
 
         boolean success = findTodosOnClosedCards(todosByIssue, jiraClient);
         success &= findTodosWithoutACardNumber(todosByIssue);
@@ -170,9 +182,9 @@ public class TodoCheckerMain
 
     /**
      * Sort the list into a multimap from JiraCard to CodeTodos.
-     *
+     * <p>
      * Any CodeTodos with no card will be included at the "null" key.
-     *
+     * <p>
      * Any CodeTodos against ignored projects will not be returned
      */
     private Multimap<Issue, CodeTodo> groupTodosByJiraIssue(List<CodeTodo> allTodos) throws Exception {
@@ -228,7 +240,7 @@ public class TodoCheckerMain
     private boolean findTodosOnClosedCards(
         Multimap<Issue, CodeTodo> todosByIssue,
         JiraClient jiraClient)
-            throws Exception {
+        throws Exception {
 
         boolean ok = true;
         for (Map.Entry<Issue, Collection<CodeTodo>> entry : todosByIssue.asMap().entrySet()) {
@@ -240,13 +252,13 @@ public class TodoCheckerMain
             BasicResolution resolution = issue.getResolution();
             if (resolution != null) {
                 logAndReportError("TODOs on a resolved '%s' JIRA card found %s",
-                        resolution.getName(),
-                        jiraClient.getViewUrl(issue));
+                                  resolution.getName(),
+                                  jiraClient.getViewUrl(issue));
                 for (CodeTodo codeTodo : entry.getValue()) {
                     logAndReportError("  %s:%s %s",
-                            codeTodo.getFile(),
-                            codeTodo.getLineNumber(),
-                            codeTodo.getLine());
+                                      codeTodo.getFile(),
+                                      codeTodo.getLineNumber(),
+                                      codeTodo.getLine());
                 }
                 ok = false;
             }
@@ -257,13 +269,13 @@ public class TodoCheckerMain
                 case "UAT":
                 case "Done":
                     logAndReportError("TODOs on a JIRA card with status '%s': %s",
-                            issue.getStatus().getName(),
-                            jiraClient.getViewUrl(issue));
+                                      issue.getStatus().getName(),
+                                      jiraClient.getViewUrl(issue));
                     for (CodeTodo codeTodo : entry.getValue()) {
                         logAndReportError("  %s:%s %s",
-                                codeTodo.getFile(),
-                                codeTodo.getLineNumber(),
-                                codeTodo.getLine());
+                                          codeTodo.getFile(),
+                                          codeTodo.getLineNumber(),
+                                          codeTodo.getLine());
                     }
                     ok = false;
             }
@@ -279,14 +291,14 @@ public class TodoCheckerMain
         logAndReportError("TODOs without a JIRA card found:");
         for (CodeTodo codeTodo : codeTodos) {
             logAndReportError("  %s:%s %s",
-                    codeTodo.getFile(),
-                    codeTodo.getLineNumber(),
-                    codeTodo.getLine());
+                              codeTodo.getFile(),
+                              codeTodo.getLineNumber(),
+                              codeTodo.getLine());
         }
         return false;
     }
 
-    private void logAndReportError(String formatString, Object ...args) {
+    private void logAndReportError(String formatString, Object... args) {
         String error = String.format(formatString, args);
         log.error(error);
         errorReport.append(error).append('\n');

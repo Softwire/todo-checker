@@ -18,16 +18,16 @@ public class TodoFinder {
 
     private static final Pattern GREP_LINE_PATT = Pattern.compile(
             "([^:]+):(\\d+):(.*)");
-    private final File srcDir;
+    private final GitCheckout gitCheckout;
 
-    public TodoFinder(File srcDir) {
-        this.srcDir = srcDir;
+    public TodoFinder(GitCheckout gitCheckout) {
+        this.gitCheckout = gitCheckout;
     }
 
     public List<CodeTodo> findAllTodosInSource(String excludePathRegex) throws Exception {
         // We use "git grep" since it will automatically search only in committed
         // files without needing any complicated features.
-        List<String> matches = git("grep", "-iIwn", "to" + "do");
+        List<String> matches = gitCheckout.git("grep", "-iIwn", "to" + "do");
 
         Pattern excludePat = excludePathRegex == null ? null : Pattern.compile(excludePathRegex);
 
@@ -43,41 +43,7 @@ public class TodoFinder {
         return new CodeTodo(
                 new File(matcher.group(1)),
                 Integer.parseInt(matcher.group(2)),
-                matcher.group(3));
-    }
-
-    private List<String> git(String... args) throws Exception {
-        return exec(Lists.asList("git", args).toArray(new String[0]));
-    }
-
-    private List<String> exec(String... cmd) throws Exception {
-        ProcessBuilder builder = new ProcessBuilder(cmd);
-        // This simplifies threading, as it avoids deadlock on stderr blocking
-        builder.redirectErrorStream(true);
-
-        builder.directory(srcDir);
-
-        Process process = builder.start();
-
-        process.getOutputStream().close();
-
-        ArrayList<String> output = new ArrayList<>();
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(process.getInputStream()))) {
-
-            String line;
-            while ((line = reader.readLine()) != null) {
-                output.add(line);
-            }
-            int ret = process.waitFor();
-            if (ret != 0) {
-                throw new IOException(String.format(
-                        "exec \"%s\" failed with code %s. Output was:\n%s",
-                        String.join(" ", cmd),
-                        ret,
-                        String.join("\n", output)));
-            }
-            return output;
-        }
+                matcher.group(3),
+                gitCheckout);
     }
 }
