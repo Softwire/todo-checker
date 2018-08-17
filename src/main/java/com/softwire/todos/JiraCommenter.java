@@ -105,10 +105,27 @@ public class JiraCommenter {
     private String commentText(CodeTodo value) {
         String path = value.getFile().getPath().replace('\\', '/');
 
-        // See https://getsupport.atlassian.com/servicedesk/customer/portal/23/JST-408644
+        String linkUrl = value.getContainingGitCheckout()
+            .getSourceControlLinkFormatter()
+            .build(path, value.getLineNumber());
+
+        // See https://jira.atlassian.com/browse/JRACLOUD-69992
         // this doesn't link properly on new Cloud Jira...
+        //
+        // We should delete this code when the above bug is fixed
+        String jiraBugWorkaroundLink;
+        if (jiraClient.getServerInfo().getBuildNumber() < 199999) {
+            log.debug("This looks like a Cloud Jenkins with https://jira.atlassian.com/browse/JRACLOUD-69992");
+            jiraBugWorkaroundLink = String.format(
+                "[(view)|%s] ",
+                linkUrl);
+        } else {
+            jiraBugWorkaroundLink = "";
+        }
+
         return String.format(
-                " * {{[%s:%s|%s]}}",
+                " * %s{{[%s:%s|%s]}}",
+                jiraBugWorkaroundLink,
                 path,
                 value.getLine()
                         .replace("|", "\\|")
@@ -116,9 +133,7 @@ public class JiraCommenter {
                         .replace("]", "\\]")
                         .replace("{", "\\{")
                         .replace("}", "\\}"),
-                value.getContainingGitCheckout()
-                        .getSourceControlLinkFormatter()
-                        .build(path, value.getLineNumber()));
+                linkUrl);
     }
 
     private Comment findTodoComment(Issue issue) {

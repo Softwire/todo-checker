@@ -2,7 +2,6 @@ package com.softwire.todos;
 
 import com.atlassian.jira.rest.client.JiraRestClient;
 import com.atlassian.jira.rest.client.ProgressMonitor;
-import com.atlassian.jira.rest.client.auth.AnonymousAuthenticationHandler;
 import com.atlassian.jira.rest.client.domain.*;
 import com.atlassian.jira.rest.client.internal.jersey.AbstractJerseyRestClient;
 import com.atlassian.jira.rest.client.internal.jersey.JerseyIssueRestClient;
@@ -18,7 +17,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.core.UriBuilder;
-import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URI;
@@ -42,6 +40,7 @@ public class JiraClient {
     private final JiraRestClient restClient;
     private Map<String, Issue> issuesByKey = new HashMap<>();
     private final Logger log = LoggerFactory.getLogger(getClass());
+    private ServerInfo serverInfo;
 
     public JiraClient(Config config) throws URISyntaxException {
         this.config = config;
@@ -49,6 +48,13 @@ public class JiraClient {
 
         restClient = new JerseyJiraRestClientFactory()
                 .createWithBasicHttpAuthentication(serverUri, config.getJiraUsername(), config.getJiraPassword());
+    }
+
+    public ServerInfo getServerInfo() {
+        if (serverInfo == null) {
+            serverInfo = restClient.getMetadataClient().getServerInfo(null);
+        }
+        return serverInfo;
     }
 
     public Issue getIssue(String key) throws Exception {
