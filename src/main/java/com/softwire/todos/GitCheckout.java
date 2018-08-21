@@ -40,7 +40,8 @@ public class GitCheckout {
         } else {
             // Auto-detect
             try {
-                List<String> output = git("remote", "get-url", "origin");
+                // (In Git >= 2.7.0 we could do "git remote get-url origin")
+                List<String> output = git("ls-remote", "--get-url", "origin");
                 String originUrl = Iterables.getOnlyElement(output);
                 Matcher matcher = GITHUB_URL_PAT.matcher(originUrl);
                 checkArgument(matcher.matches());
