@@ -10,8 +10,14 @@ import com.atlassian.jira.rest.client.internal.jersey.JerseySearchRestClient;
 import com.atlassian.jira.rest.client.internal.json.JsonObjectParser;
 import com.atlassian.jira.rest.client.internal.json.SearchResultJsonParser;
 import com.atlassian.jira.rest.client.internal.json.gen.CommentJsonGenerator;
+import com.sun.jersey.api.client.ClientRequest;
 import com.sun.jersey.api.client.WebResource;
 import com.sun.jersey.client.apache.ApacheHttpClient;
+import com.sun.jersey.client.apache.ApacheHttpClientHandler;
+import com.sun.jersey.client.apache.ApacheHttpMethodExecutor;
+import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.HttpMethod;
+import org.apache.commons.httpclient.URIException;
 import org.codehaus.jettison.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,10 +27,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -47,7 +50,25 @@ public class JiraClient {
         URI serverUri = new URI(config.getJiraUrl());
 
         restClient = new JerseyJiraRestClientFactory()
-                .createWithBasicHttpAuthentication(serverUri, config.getJiraUsername(), config.getJiraPassword());
+            .createWithBasicHttpAuthentication(
+                serverUri,
+                config.getJiraUsername(),
+                config.getJiraPassword());
+
+        // The default Jersey HTTP client does not appear to have any retry logic available.
+        //
+        // The underlying Apache Http client has retry logic, but only for IOExceptions,
+        // not for HTTP status codes like 429.
+        // Apache HTTP added status code based retry in ver 4, but we are stuck on v3 so
+        // that we can use the v1 JIRA client, which is a lot easier to use than the
+        // half-finished async v6 client api.
+        //
+        // We poke our override inside the client using reflection, as the public
+        // extension points to do so are very cumbersome:
+        ApacheHttpClient client = (ApacheHttpClient) readField(restClient, "client");
+        ApacheHttpClientHandler clientHandler = (ApacheHttpClientHandler) readField(client, "clientHandler");
+        ApacheHttpMethodExecutor methodExecutor = (ApacheHttpMethodExecutor) readField(clientHandler, "methodExecutor");
+        writeField(clientHandler, "methodExecutor", new ApacheMethodExecutorWithRetryAfterSupport(methodExecutor));
     }
 
     public ServerInfo getServerInfo() {
@@ -180,11 +201,122 @@ public class JiraClient {
         return (ApacheHttpClient) field.get(client);
     }
 
+    private static Object readField(Object o, String fieldName) {
+        try {
+            Class<?> clazz = o.getClass();
+            Field field;
+            try {
+                field = clazz.getDeclaredField(fieldName);
+            } catch (NoSuchFieldException e) {
+                field = clazz.getSuperclass().getDeclaredField(fieldName);
+            }
+            field.setAccessible(true);
+            return field.get(o);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static void writeField(Object o, String fieldName, Object val) {
+        try {
+            Field field = o.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(o, val);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public interface Config {
         String getRestrictToSingleCardId();
+
         boolean getWriteToJira();
+
         String getJiraUrl();
+
         String getJiraUsername();
+
         String getJiraPassword();
+    }
+
+    private static class ApacheMethodExecutorWithRetryAfterSupport
+        implements ApacheHttpMethodExecutor {
+        private final Logger log = LoggerFactory.getLogger(getClass());
+        private final ApacheHttpMethodExecutor inner;
+        private static final int MAX_RETRY_COUNT = 3;
+
+        private ApacheMethodExecutorWithRetryAfterSupport(ApacheHttpMethodExecutor inner) {
+            this.inner = inner;
+        }
+
+        @Override
+        public void executeMethod(HttpMethod method, ClientRequest cr) {
+
+            int attemptCount = 0;
+            while (true) {
+                inner.executeMethod(method, cr);
+                Optional<Integer> retryDelaySec = getRetryDelaySec(attemptCount, method, cr);
+
+                if (!retryDelaySec.isPresent()) {
+                    return;
+                } else {
+                    try {
+                        Thread.sleep(retryDelaySec.get() * 1000);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+
+                    // The method should now be re-usable in most cases.
+                    //
+                    // c.f. the retry loop in HttpMethodDirector.executeWithRetry
+                    //
+                    // If the request body is from a stream or similar, it will throw at
+                    // executeMethod above
+                    method.releaseConnection();
+                }
+
+                attemptCount++;
+            }
+        }
+
+        private Optional<Integer> getRetryDelaySec(int attemptCount, HttpMethod method, ClientRequest cr) {
+
+            // 429 TOO MANY REQUESTS
+            // https://httpstatuses.com/429
+            if (method.getStatusCode() == 429 && attemptCount < MAX_RETRY_COUNT) {
+                Header retryAfterHeader = method.getResponseHeader("Retry-After");
+                int retryDelaySec;
+                if (retryAfterHeader != null) {
+                    retryDelaySec =
+                        Math.max(10,
+                                 Math.min(600,
+                                          Integer.parseInt(retryAfterHeader.getValue())));
+
+                } else {
+                    retryDelaySec = (30 * (attemptCount + 1));
+                }
+
+                String uri;
+                try {
+                    uri = method.getURI().toString();
+                } catch (URIException e) {
+                    uri = e.toString();
+                }
+
+                log.warn(
+                    "Received a {} response from {}. " +
+                    "Response Retry-After was {}. " +
+                    "Pausing for {}s before retrying.",
+                    method.getStatusLine(),
+                    uri,
+                    retryAfterHeader,
+                    retryDelaySec);
+
+                return Optional.of(retryDelaySec);
+            } else {
+                return Optional.empty();
+            }
+        }
     }
 }
