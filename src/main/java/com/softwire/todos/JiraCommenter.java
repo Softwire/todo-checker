@@ -132,7 +132,9 @@ public class JiraCommenter {
                         .replace("[", "\\[")
                         .replace("]", "\\]")
                         .replace("{", "\\{")
-                        .replace("}", "\\}"),
+                        .replace("}", "\\}")
+                        .replaceAll("([^-])-([A-Za-z])", "$1\\\\-$2")
+                        .replaceAll("--([A-Za-z])", "\\\\-\\\\-$1"),
                 linkUrl);
     }
 
