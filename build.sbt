@@ -8,5 +8,8 @@ libraryDependencies ++= Seq(
 )
 
 resolvers ++= Seq(
-  "atlassian-public" at "https://maven.atlassian.com/content/repositories/atlassian-public"
+  "atlassian-public" at "https://maven.atlassian.com/content/repositories/atlassian-public",
+  "atlassian-public2" at "https://packages.atlassian.com/maven-public/",
+  "atlassian-public3" at "https://packages.atlassian.com/public/",
+  "atlassian-public4" at "https://m2proxy.atlassian.com/repository/public"
 )
