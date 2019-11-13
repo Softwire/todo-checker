@@ -1,5 +1,6 @@
 package com.softwire.todos;
 
+import com.atlassian.jira.rest.client.RestClientException;
 import com.atlassian.jira.rest.client.domain.BasicResolution;
 import com.atlassian.jira.rest.client.domain.Issue;
 import com.google.common.base.Joiner;
@@ -132,6 +133,14 @@ public class TodoCheckerMain
             System.err.println(e.getMessage());
             parser.printUsage(System.err);
             success = false;
+        } catch (RestClientException e) {
+            if (e.getMessage().contains("Client response status: 401")) {
+                System.err.println(
+                        "NOTE: for Cloud Jenkins, you will need to create an API key for your\n" +
+                                "      account and pass that as your password.\n" +
+                                "      Visit https://id.atlassian.com/manage/api-tokens");
+            }
+            throw e;
         }
 
         System.exit(success ? 0 : 1);
