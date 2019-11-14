@@ -106,36 +106,45 @@ public class JiraCommenter {
         String path = value.getFile().getPath().replace('\\', '/');
 
         String linkUrl = value.getContainingGitCheckout()
-            .getSourceControlLinkFormatter()
-            .build(path, value.getLineNumber());
+                .getSourceControlLinkFormatter()
+                .build(path, value.getLineNumber());
 
-        // See https://jira.atlassian.com/browse/JRACLOUD-69992
-        // this doesn't link properly on new Cloud Jira...
+        String escapedCodeLine = value.getLine()
+                .replace("|", "\\|")
+                .replace("[", "\\[")
+                .replace("]", "\\]")
+                .replace("{", "\\{")
+                .replace("}", "\\}")
+                .replaceAll("([^-])-([A-Za-z])", "$1\\\\-$2")
+                .replaceAll("--([A-Za-z])", "\\\\-\\\\-$1");
+
+        // JIRA have been changing their comment format, and don't seem to have documented
+        // the new format.
+        // I have seen the following versions:
+        // * Cloud JIRA on 2019-11-14, build number "100114":
+        //    - Comments seem to take Markdown syntax, there is no "Visual" v.s "Text" mode for comments
+        //    - The UI editor does not allow linking inside `code` formatting
+        //    - If we pass [link|url] inside {{code}} or `code`, it doesn't work
+        //    - Although the UI seems to want markdown, the API still seems to want Atlassian wiki syntax
+        // * On premises JIRA on 2019-11-14, build number "76011" (?check)
+        //    - Comments box have "Visual" v.s "Text" mode, seem to use the old Atlassian wiki syntax
+        //    - links inside {{code}} work fine
         //
-        // We should delete this code when the above bug is fixed
-        String jiraBugWorkaroundLink;
+        // See https://jira.atlassian.com/browse/JRACLOUD-69992 (now closed)
         if (jiraClient.getServerInfo().getBuildNumber() < 199999) {
-            log.debug("This looks like a Cloud Jenkins with https://jira.atlassian.com/browse/JRACLOUD-69992");
-            jiraBugWorkaroundLink = String.format(
-                "[(view)|%s] ",
-                linkUrl);
+            log.debug("This looks like a Cloud Jenkins, we cannot link inside code");
+            return String.format(
+                    "* [(view)|%s] {{%s:%s}}",
+                    linkUrl,
+                    path,
+                    escapedCodeLine);
         } else {
-            jiraBugWorkaroundLink = "";
+            return String.format(
+                    " * {{[%s:%s|%s]}}",
+                    path,
+                    escapedCodeLine,
+                    linkUrl);
         }
-
-        return String.format(
-                " * %s{{[%s:%s|%s]}}",
-                jiraBugWorkaroundLink,
-                path,
-                value.getLine()
-                        .replace("|", "\\|")
-                        .replace("[", "\\[")
-                        .replace("]", "\\]")
-                        .replace("{", "\\{")
-                        .replace("}", "\\}")
-                        .replaceAll("([^-])-([A-Za-z])", "$1\\\\-$2")
-                        .replaceAll("--([A-Za-z])", "\\\\-\\\\-$1"),
-                linkUrl);
     }
 
     private Comment findTodoComment(Issue issue) {

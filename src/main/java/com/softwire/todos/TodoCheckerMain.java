@@ -154,6 +154,8 @@ public class TodoCheckerMain
                      "as a command-line argument");
         }
 
+        log.info("Connected to JIRA, server build number = {}", jiraClient.getServerInfo().getBuildNumber());
+
         List<CodeTodo> allTodos = this.srcDirs.stream()
             .flatMap(srcDir -> {
                 try {
