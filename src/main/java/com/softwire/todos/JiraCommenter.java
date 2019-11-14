@@ -109,8 +109,23 @@ public class JiraCommenter {
             .getSourceControlLinkFormatter()
             .build(path, value.getLineNumber());
 
+        // See https://jira.atlassian.com/browse/JRACLOUD-69992
+        // this doesn't link properly on new Cloud Jira...
+        //
+        // We should delete this code when the above bug is fixed
+        String jiraBugWorkaroundLink;
+        if (jiraClient.getServerInfo().getBuildNumber() < 199999) {
+            log.debug("This looks like a Cloud Jenkins with https://jira.atlassian.com/browse/JRACLOUD-69992");
+            jiraBugWorkaroundLink = String.format(
+                "[(view)|%s] ",
+                linkUrl);
+        } else {
+            jiraBugWorkaroundLink = "";
+        }
+
         return String.format(
-                " * {{[%s:%s|%s]}}",
+                " * %s{{[%s:%s|%s]}}",
+                jiraBugWorkaroundLink,
                 path,
                 value.getLine()
                         .replace("|", "\\|")
