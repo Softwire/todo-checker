@@ -121,17 +121,17 @@ public class JiraCommenter {
         // JIRA have been changing their comment format, and don't seem to have documented
         // the new format.
         // I have seen the following versions:
-        // * Cloud JIRA on 2019-11-14, build number "100114":
+        // * Cloud JIRA on 2019-11-14, build number "100114" and one with build number "804002":
         //    - Comments seem to take Markdown syntax, there is no "Visual" v.s "Text" mode for comments
         //    - The UI editor does not allow linking inside `code` formatting
         //    - If we pass [link|url] inside {{code}} or `code`, it doesn't work
         //    - Although the UI seems to want markdown, the API still seems to want Atlassian wiki syntax
-        // * On premises JIRA on 2019-11-14, build number "76011" (?check)
+        // * On premises JIRA on 2019-11-14, build number "76011"
         //    - Comments box have "Visual" v.s "Text" mode, seem to use the old Atlassian wiki syntax
         //    - links inside {{code}} work fine
         //
         // See https://jira.atlassian.com/browse/JRACLOUD-69992 (now closed)
-        if (jiraClient.getServerInfo().getBuildNumber() < 199999) {
+        if (jiraClient.getServerInfo().getBuildNumber() > 100000) {
             log.debug("This looks like a Cloud Jenkins, we cannot link inside code");
             return String.format(
                     "* [(view)|%s] {{%s:%s}}",
