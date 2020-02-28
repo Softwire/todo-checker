@@ -1,7 +1,7 @@
 package com.softwire.todos;
 
-import com.atlassian.jira.rest.client.domain.Comment;
-import com.atlassian.jira.rest.client.domain.Issue;
+import com.atlassian.jira.rest.client.api.domain.Comment;
+import com.atlassian.jira.rest.client.api.domain.Issue;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import org.slf4j.Logger;

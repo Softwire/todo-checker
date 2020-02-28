@@ -1,8 +1,8 @@
 package com.softwire.todos;
 
-import com.atlassian.jira.rest.client.RestClientException;
-import com.atlassian.jira.rest.client.domain.BasicResolution;
-import com.atlassian.jira.rest.client.domain.Issue;
+import com.atlassian.jira.rest.client.api.RestClientException;
+import com.atlassian.jira.rest.client.api.domain.Issue;
+import com.atlassian.jira.rest.client.api.domain.Resolution;
 import com.google.common.base.Joiner;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
@@ -260,7 +260,7 @@ public class TodoCheckerMain
                 continue;
             }
 
-            BasicResolution resolution = issue.getResolution();
+            Resolution resolution = issue.getResolution();
             if (resolution != null) {
                 logAndReportError("TODOs on a resolved '%s' JIRA card found %s",
                                   resolution.getName(),

@@ -1,33 +1,31 @@
 package com.softwire.todos;
 
-import com.atlassian.jira.rest.client.JiraRestClient;
-import com.atlassian.jira.rest.client.ProgressMonitor;
-import com.atlassian.jira.rest.client.domain.*;
-import com.atlassian.jira.rest.client.internal.jersey.AbstractJerseyRestClient;
-import com.atlassian.jira.rest.client.internal.jersey.JerseyIssueRestClient;
-import com.atlassian.jira.rest.client.internal.jersey.JerseyJiraRestClientFactory;
-import com.atlassian.jira.rest.client.internal.jersey.JerseySearchRestClient;
-import com.atlassian.jira.rest.client.internal.json.JsonObjectParser;
+import com.atlassian.httpclient.api.HttpClient;
+import com.atlassian.jira.rest.client.api.JiraRestClient;
+import com.atlassian.jira.rest.client.api.domain.Comment;
+import com.atlassian.jira.rest.client.api.domain.Issue;
+import com.atlassian.jira.rest.client.api.domain.SearchResult;
+import com.atlassian.jira.rest.client.api.domain.ServerInfo;
+import com.atlassian.jira.rest.client.internal.async.AbstractAsynchronousRestClient;
+import com.atlassian.jira.rest.client.internal.async.AsynchronousJiraRestClientFactory;
+import com.atlassian.jira.rest.client.internal.async.AsynchronousSearchRestClient;
+import com.atlassian.jira.rest.client.internal.json.JsonParser;
 import com.atlassian.jira.rest.client.internal.json.SearchResultJsonParser;
 import com.atlassian.jira.rest.client.internal.json.gen.CommentJsonGenerator;
-import com.sun.jersey.api.client.ClientRequest;
-import com.sun.jersey.api.client.WebResource;
-import com.sun.jersey.client.apache.ApacheHttpClient;
-import com.sun.jersey.client.apache.ApacheHttpClientHandler;
-import com.sun.jersey.client.apache.ApacheHttpMethodExecutor;
-import org.apache.commons.httpclient.Header;
-import org.apache.commons.httpclient.HttpMethod;
-import org.apache.commons.httpclient.URIException;
-import org.codehaus.jettison.json.JSONObject;
+import com.atlassian.jira.rest.client.internal.json.gen.JsonGenerator;
+import io.atlassian.util.concurrent.Promise;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.core.UriBuilder;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -49,31 +47,36 @@ public class JiraClient {
         this.config = config;
         URI serverUri = new URI(config.getJiraUrl());
 
-        restClient = new JerseyJiraRestClientFactory()
-            .createWithBasicHttpAuthentication(
-                serverUri,
-                config.getJiraUsername(),
-                config.getJiraPassword());
+        restClient = new AsynchronousJiraRestClientFactory()
+                .createWithBasicHttpAuthentication(
+                        serverUri,
+                        config.getJiraUsername(),
+                        config.getJiraPassword());
 
-        // The default Jersey HTTP client does not appear to have any retry logic available.
-        //
-        // The underlying Apache Http client has retry logic, but only for IOExceptions,
-        // not for HTTP status codes like 429.
-        // Apache HTTP added status code based retry in ver 4, but we are stuck on v3 so
-        // that we can use the v1 JIRA client, which is a lot easier to use than the
-        // half-finished async v6 client api.
-        //
-        // We poke our override inside the client using reflection, as the public
-        // extension points to do so are very cumbersome:
-        ApacheHttpClient client = (ApacheHttpClient) readField(restClient, "client");
-        ApacheHttpClientHandler clientHandler = (ApacheHttpClientHandler) readField(client, "clientHandler");
-        ApacheHttpMethodExecutor methodExecutor = (ApacheHttpMethodExecutor) readField(clientHandler, "methodExecutor");
-        writeField(clientHandler, "methodExecutor", new ApacheMethodExecutorWithRetryAfterSupport(methodExecutor));
+        // qq
+//        // The default Jersey HTTP client does not appear to have any retry logic available.
+//        //
+//        // The underlying Apache Http client has retry logic, but only for IOExceptions,
+//        // not for HTTP status codes like 429.
+//        // Apache HTTP added status code based retry in ver 4, but we are stuck on v3 so
+//        // that we can use the v1 JIRA client, which is a lot easier to use than the
+//        // half-finished async v6 client api.
+//        //
+//        // We poke our override inside the client using reflection, as the public
+//        // extension points to do so are very cumbersome:
+//        ApacheHttpClient client = (ApacheHttpClient) readField(restClient, "client");
+//        ApacheHttpClientHandler clientHandler = (ApacheHttpClientHandler) readField(client, "clientHandler");
+//        ApacheHttpMethodExecutor methodExecutor = (ApacheHttpMethodExecutor) readField(clientHandler, "methodExecutor");
+//        writeField(clientHandler, "methodExecutor", new ApacheMethodExecutorWithRetryAfterSupport(methodExecutor));
     }
 
     public ServerInfo getServerInfo() {
         if (serverInfo == null) {
-            serverInfo = restClient.getMetadataClient().getServerInfo(null);
+            try {
+                serverInfo = restClient.getMetadataClient().getServerInfo().get();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
         return serverInfo;
     }
@@ -86,17 +89,18 @@ public class JiraClient {
         Issue cached = issuesByKey.get(key);
         if (cached == null) {
             log.debug("Fetching card info for {}", key);
-            cached = restClient.getIssueClient().getIssue(key, null);
+            cached = restClient.getIssueClient().getIssue(key).get();
             issuesByKey.put(key, cached);
         }
         return cached;
     }
 
-    public void addComment(Issue issue, Comment comment) {
+    public void addComment(Issue issue, Comment comment) throws Exception {
         if (config.getWriteToJira()) {
             log.info("Adding comment to {}", issue.getKey());
             restClient.getIssueClient()
-                    .addComment(null, issue.getCommentsUri(), comment);
+                    .addComment(issue.getCommentsUri(), comment)
+                    .get();
         } else {
             log.info("Not adding comment to {}:\n{}", issue.getKey(), comment.getBody());
         }
@@ -110,16 +114,37 @@ public class JiraClient {
             log.info("Updating comment on {}", issue.getKey());
 
             // The public interface doesn't offer an "update" call:
-            JerseyIssueRestClient client = (JerseyIssueRestClient) restClient.getIssueClient();
+            AbstractAsynchronousRestClient client = (AbstractAsynchronousRestClient) restClient.getIssueClient();
 
-            // c.f. AbstractJerseyRestClient#post
-            WebResource webResource = getApacheClient(client)
-                    .resource(oldComment.getSelf());
-            JSONObject body = new CommentJsonGenerator(
-                    getServerInfo(client)).generate(newComment);
-            webResource.put(body);
+            new ClientWrapper(client)
+                    .put2(
+                            oldComment.getSelf(),
+                            newComment,
+                            new CommentJsonGenerator(getServerInfo()))
+                    .get();
         } else {
             log.info("Not updating comment to {}:\n{}", issue.getKey(), newComment.getBody());
+        }
+    }
+
+    /**
+     * This wrapper just exposes somes protected methods
+     */
+    private class ClientWrapper extends AbstractAsynchronousRestClient {
+        public ClientWrapper(AbstractAsynchronousRestClient inner) throws Exception {
+            super(getApacheClient(inner));
+        }
+
+        public <T> Promise<Void> put2(final URI uri, final T entity, final JsonGenerator<T> jsonGenerator) {
+            return super.put(uri, entity, jsonGenerator);
+        }
+
+        public final Promise<Void> delete2(final URI uri) {
+            return delete(uri);
+        }
+
+        public <T> Promise<T> getAndParse2(final URI uri, final JsonParser<?, T> parser) {
+            return getAndParse(uri, parser);
         }
     }
 
@@ -128,12 +153,11 @@ public class JiraClient {
             log.info("Deleting comment on {}", issue.getKey());
 
             // The public interface doesn't offer a "delete" call:
-            JerseyIssueRestClient client = (JerseyIssueRestClient) restClient.getIssueClient();
+            AbstractAsynchronousRestClient client = (AbstractAsynchronousRestClient) restClient.getIssueClient();
 
-            // c.f. AbstractJerseyRestClient#post
-            WebResource webResource = getApacheClient(client)
-                    .resource(comment.getSelf());
-            webResource.delete();
+            new ClientWrapper(client)
+                    .delete2(comment.getSelf())
+                    .get();
         } else {
             log.info("Not deleting comment to {}:\n{}", issue.getKey(), comment.getBody());
         }
@@ -142,21 +166,20 @@ public class JiraClient {
     public Set<Issue> searchJqlWithFullIssues(String jql) throws Exception {
         // The public implementation in SearchRestClient doesn't let us request
         // the comments, so we'll unwrap the innards:
-        JerseySearchRestClient client = (JerseySearchRestClient) restClient.getSearchClient();
+        AsynchronousSearchRestClient client = (AsynchronousSearchRestClient) restClient.getSearchClient();
         UriBuilder uriBuilder = UriBuilder
                 .fromUri(getSearchUri(client))
                 .queryParam("jql", jql);
         uriBuilder = uriBuilder.queryParam("maxResults", 1000);
         URI uri = uriBuilder.queryParam("fields", "*all").build();
 
-        SearchResult searchResult = getAndParse(
-                client,
-                uri,
-                new SearchResultJsonParser(true),
-                null);
+        SearchResult searchResult = new ClientWrapper(client)
+                .getAndParse2(
+                        uri,
+                        new SearchResultJsonParser()).get();
 
         Set<Issue> issues = new LinkedHashSet<>();
-        for (BasicIssue issue : searchResult.getIssues()) {
+        for (Issue issue : searchResult.getIssues()) {
             if (config.getRestrictToSingleCardId() == null || issue.getKey().equals(config.getRestrictToSingleCardId())) {
                 issues.add((Issue) issue);
             }
@@ -168,63 +191,16 @@ public class JiraClient {
         return new URI(config.getJiraUrl()).resolve("browse/" + issue.getKey()).toString();
     }
 
-    private SearchResult getAndParse(
-            AbstractJerseyRestClient client,
-            URI uri,
-            SearchResultJsonParser searchResultJsonParser,
-            ProgressMonitor progressMonitor)
-            throws Exception {
-        Method method = AbstractJerseyRestClient.class.getDeclaredMethod(
-                "getAndParse",
-                URI.class,
-                JsonObjectParser.class,
-                ProgressMonitor.class);
-        method.setAccessible(true);
-        return (SearchResult) method.invoke(client, uri, searchResultJsonParser, progressMonitor);
-    }
-
-    private URI getSearchUri(JerseySearchRestClient client) throws Exception {
-        Field field = JerseySearchRestClient.class.getDeclaredField("searchUri");
+    private URI getSearchUri(AsynchronousSearchRestClient client) throws Exception {
+        Field field = AsynchronousSearchRestClient.class.getDeclaredField("searchUri");
         field.setAccessible(true);
         return (URI) field.get(client);
     }
 
-    private ServerInfo getServerInfo(JerseyIssueRestClient client) throws Exception {
-        Field field = JerseyIssueRestClient.class.getDeclaredField("serverInfo");
+    private HttpClient getApacheClient(AbstractAsynchronousRestClient client) throws Exception {
+        Field field = AbstractAsynchronousRestClient.class.getDeclaredField("client");
         field.setAccessible(true);
-        return (ServerInfo) field.get(client);
-    }
-
-    private ApacheHttpClient getApacheClient(AbstractJerseyRestClient client) throws Exception {
-        Field field = AbstractJerseyRestClient.class.getDeclaredField("client");
-        field.setAccessible(true);
-        return (ApacheHttpClient) field.get(client);
-    }
-
-    private static Object readField(Object o, String fieldName) {
-        try {
-            Class<?> clazz = o.getClass();
-            Field field;
-            try {
-                field = clazz.getDeclaredField(fieldName);
-            } catch (NoSuchFieldException e) {
-                field = clazz.getSuperclass().getDeclaredField(fieldName);
-            }
-            field.setAccessible(true);
-            return field.get(o);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private static void writeField(Object o, String fieldName, Object val) {
-        try {
-            Field field = o.getClass().getDeclaredField(fieldName);
-            field.setAccessible(true);
-            field.set(o, val);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        return (HttpClient) field.get(client);
     }
 
     public interface Config {
@@ -239,8 +215,9 @@ public class JiraClient {
         String getJiraPassword();
     }
 
+    /* qq
     private static class ApacheMethodExecutorWithRetryAfterSupport
-        implements ApacheHttpMethodExecutor {
+            implements ApacheHttpMethodExecutor {
         private final Logger log = LoggerFactory.getLogger(getClass());
         private final ApacheHttpMethodExecutor inner;
         private static final int MAX_RETRY_COUNT = 3;
@@ -289,9 +266,9 @@ public class JiraClient {
                 int retryDelaySec;
                 if (retryAfterHeader != null) {
                     retryDelaySec =
-                        Math.max(10,
-                                 Math.min(600,
-                                          Integer.parseInt(retryAfterHeader.getValue())));
+                            Math.max(10,
+                                    Math.min(600,
+                                            Integer.parseInt(retryAfterHeader.getValue())));
 
                 } else {
                     retryDelaySec = (30 * (attemptCount + 1));
@@ -305,18 +282,18 @@ public class JiraClient {
                 }
 
                 log.warn(
-                    "Received a {} response from {}. " +
-                    "Response Retry-After was {}. " +
-                    "Pausing for {}s before retrying.",
-                    method.getStatusLine(),
-                    uri,
-                    retryAfterHeader,
-                    retryDelaySec);
+                        "Received a {} response from {}. " +
+                                "Response Retry-After was {}. " +
+                                "Pausing for {}s before retrying.",
+                        method.getStatusLine(),
+                        uri,
+                        retryAfterHeader,
+                        retryDelaySec);
 
                 return Optional.of(retryDelaySec);
             } else {
                 return Optional.empty();
             }
         }
-    }
+    }*/
 }
