@@ -64,9 +64,15 @@ public class JiraCommenter {
                         Comment.valueOf(commentText));
             } else if (!existingComment.getBody().equals(commentText)) {
                 jiraClient.updateComment(
-                        issue,
-                        existingComment,
-                        Comment.valueOf(commentText));
+                        new Comment(
+                                existingComment.getSelf(),
+                                commentText,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null));
             } else {
                 log.debug("No change needed to comment on {}", issue.getKey());
             }
@@ -75,7 +81,7 @@ public class JiraCommenter {
         // 2. For any cards with a previous TODOs comment that no longer has
         // any todos, delete it:
         Set<Issue> issuesWithTodoComments =
-                jiraClient.searchJqlWithFullIssues(commentSearchJql);
+                jiraClient.searchIssuesWithComments(commentSearchJql);
 
         for (Issue issue : issuesWithTodoComments) {
 
@@ -98,8 +104,8 @@ public class JiraCommenter {
                         "%s",
                 commentPreamble,
                 value.stream()
-                    .map(this::commentText)
-                    .collect(Collectors.joining("\n")));
+                        .map(this::commentText)
+                        .collect(Collectors.joining("\n")));
     }
 
     private String commentText(CodeTodo value) {

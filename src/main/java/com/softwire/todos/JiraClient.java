@@ -21,10 +21,7 @@ import javax.ws.rs.core.UriBuilder;
 import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -52,22 +49,6 @@ public class JiraClient {
                         serverUri,
                         config.getJiraUsername(),
                         config.getJiraPassword());
-
-        // qq
-//        // The default Jersey HTTP client does not appear to have any retry logic available.
-//        //
-//        // The underlying Apache Http client has retry logic, but only for IOExceptions,
-//        // not for HTTP status codes like 429.
-//        // Apache HTTP added status code based retry in ver 4, but we are stuck on v3 so
-//        // that we can use the v1 JIRA client, which is a lot easier to use than the
-//        // half-finished async v6 client api.
-//        //
-//        // We poke our override inside the client using reflection, as the public
-//        // extension points to do so are very cumbersome:
-//        ApacheHttpClient client = (ApacheHttpClient) readField(restClient, "client");
-//        ApacheHttpClientHandler clientHandler = (ApacheHttpClientHandler) readField(client, "clientHandler");
-//        ApacheHttpMethodExecutor methodExecutor = (ApacheHttpMethodExecutor) readField(clientHandler, "methodExecutor");
-//        writeField(clientHandler, "methodExecutor", new ApacheMethodExecutorWithRetryAfterSupport(methodExecutor));
     }
 
     public ServerInfo getServerInfo() {
@@ -106,24 +87,15 @@ public class JiraClient {
         }
     }
 
-    public void updateComment(
-            Issue issue,
-            Comment oldComment,
-            Comment newComment) throws Exception {
+    public void updateComment(Comment comment) throws Exception {
         if (config.getWriteToJira()) {
-            log.info("Updating comment on {}", issue.getKey());
+            log.info("Updating comment {}", comment.getSelf());
 
-            // The public interface doesn't offer an "update" call:
-            AbstractAsynchronousRestClient client = (AbstractAsynchronousRestClient) restClient.getIssueClient();
-
-            new ClientWrapper(client)
-                    .put2(
-                            oldComment.getSelf(),
-                            newComment,
-                            new CommentJsonGenerator(getServerInfo()))
+            restClient.getIssueClient()
+                    .updateComment(comment)
                     .get();
         } else {
-            log.info("Not updating comment to {}:\n{}", issue.getKey(), newComment.getBody());
+            log.info("Not updating comment {}:\n{}", comment.getSelf(), comment.getBody());
         }
     }
 
@@ -152,36 +124,22 @@ public class JiraClient {
         if (config.getWriteToJira()) {
             log.info("Deleting comment on {}", issue.getKey());
 
-            // The public interface doesn't offer a "delete" call:
-            AbstractAsynchronousRestClient client = (AbstractAsynchronousRestClient) restClient.getIssueClient();
-
-            new ClientWrapper(client)
-                    .delete2(comment.getSelf())
+            restClient.getIssueClient()
+                    .deleteComment(comment)
                     .get();
         } else {
             log.info("Not deleting comment to {}:\n{}", issue.getKey(), comment.getBody());
         }
     }
 
-    public Set<Issue> searchJqlWithFullIssues(String jql) throws Exception {
-        // The public implementation in SearchRestClient doesn't let us request
-        // the comments, so we'll unwrap the innards:
-        AsynchronousSearchRestClient client = (AsynchronousSearchRestClient) restClient.getSearchClient();
-        UriBuilder uriBuilder = UriBuilder
-                .fromUri(getSearchUri(client))
-                .queryParam("jql", jql);
-        uriBuilder = uriBuilder.queryParam("maxResults", 1000);
-        URI uri = uriBuilder.queryParam("fields", "*all").build();
-
-        SearchResult searchResult = new ClientWrapper(client)
-                .getAndParse2(
-                        uri,
-                        new SearchResultJsonParser()).get();
+    public Set<Issue> searchIssuesWithComments(String jql) throws Exception {
+        SearchResult searchResult = restClient.getSearchClient()
+                .searchJql(jql, 1000, null, Collections.singleton("comment")).get();
 
         Set<Issue> issues = new LinkedHashSet<>();
         for (Issue issue : searchResult.getIssues()) {
             if (config.getRestrictToSingleCardId() == null || issue.getKey().equals(config.getRestrictToSingleCardId())) {
-                issues.add((Issue) issue);
+                issues.add(issue);
             }
         }
         return issues;
@@ -189,12 +147,6 @@ public class JiraClient {
 
     public String getViewUrl(Issue issue) throws Exception {
         return new URI(config.getJiraUrl()).resolve("browse/" + issue.getKey()).toString();
-    }
-
-    private URI getSearchUri(AsynchronousSearchRestClient client) throws Exception {
-        Field field = AsynchronousSearchRestClient.class.getDeclaredField("searchUri");
-        field.setAccessible(true);
-        return (URI) field.get(client);
     }
 
     private HttpClient getApacheClient(AbstractAsynchronousRestClient client) throws Exception {
@@ -214,86 +166,4 @@ public class JiraClient {
 
         String getJiraPassword();
     }
-
-    /* qq
-    private static class ApacheMethodExecutorWithRetryAfterSupport
-            implements ApacheHttpMethodExecutor {
-        private final Logger log = LoggerFactory.getLogger(getClass());
-        private final ApacheHttpMethodExecutor inner;
-        private static final int MAX_RETRY_COUNT = 3;
-
-        private ApacheMethodExecutorWithRetryAfterSupport(ApacheHttpMethodExecutor inner) {
-            this.inner = inner;
-        }
-
-        @Override
-        public void executeMethod(HttpMethod method, ClientRequest cr) {
-
-            int attemptCount = 0;
-            while (true) {
-                inner.executeMethod(method, cr);
-                Optional<Integer> retryDelaySec = getRetryDelaySec(attemptCount, method, cr);
-
-                if (!retryDelaySec.isPresent()) {
-                    return;
-                } else {
-                    try {
-                        Thread.sleep(retryDelaySec.get() * 1000);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        return;
-                    }
-
-                    // The method should now be re-usable in most cases.
-                    //
-                    // c.f. the retry loop in HttpMethodDirector.executeWithRetry
-                    //
-                    // If the request body is from a stream or similar, it will throw at
-                    // executeMethod above
-                    method.releaseConnection();
-                }
-
-                attemptCount++;
-            }
-        }
-
-        private Optional<Integer> getRetryDelaySec(int attemptCount, HttpMethod method, ClientRequest cr) {
-
-            // 429 TOO MANY REQUESTS
-            // https://httpstatuses.com/429
-            if (method.getStatusCode() == 429 && attemptCount < MAX_RETRY_COUNT) {
-                Header retryAfterHeader = method.getResponseHeader("Retry-After");
-                int retryDelaySec;
-                if (retryAfterHeader != null) {
-                    retryDelaySec =
-                            Math.max(10,
-                                    Math.min(600,
-                                            Integer.parseInt(retryAfterHeader.getValue())));
-
-                } else {
-                    retryDelaySec = (30 * (attemptCount + 1));
-                }
-
-                String uri;
-                try {
-                    uri = method.getURI().toString();
-                } catch (URIException e) {
-                    uri = e.toString();
-                }
-
-                log.warn(
-                        "Received a {} response from {}. " +
-                                "Response Retry-After was {}. " +
-                                "Pausing for {}s before retrying.",
-                        method.getStatusLine(),
-                        uri,
-                        retryAfterHeader,
-                        retryDelaySec);
-
-                return Optional.of(retryDelaySec);
-            } else {
-                return Optional.empty();
-            }
-        }
-    }*/
 }
