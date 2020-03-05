@@ -7,15 +7,8 @@ libraryDependencies ++= {
     "ch.qos.logback" % "logback-classic" % "1.1.3",
 
     "com.atlassian.jira" % "jira-rest-java-client-app" % "5.2.2-rtb"
-      from "https://richardbradley.github.io/jira-rest-java-client/releases/jira-rest-java-client-app-5.2.2-rtb-jar-with-dependencies.jar"
-      notTransitive(),
-
-    // Something weird is going on with Ivy here.
-    "com.atlassian.sal" % "sal-api" % "3.0.7"
-      from "https://repo.spring.io/plugins-release/com/atlassian/sal/sal-api/3.0.7/sal-api-3.0.7.jar",
-    "javax.ws.rs" % "javax.ws.rs-api" % "2.1.1",
-    "org.glassfish.jersey.core" % "jersey-common" % "2.30.1",
-
+      notTransitive()
+      from "https://richardbradley.github.io/jira-rest-java-client/releases/jira-rest-java-client-app-5.2.2-rtb-jar-with-dependencies.jar",
 
     "args4j" % "args4j" % "2.33",
     "junit" % "junit" % "4.4" % Test,
