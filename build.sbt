@@ -7,7 +7,8 @@ libraryDependencies ++= {
     "ch.qos.logback" % "logback-classic" % "1.1.3",
 
     "com.atlassian.jira" % "jira-rest-java-client-app" % "5.2.2-rtb"
-      from "https://richardbradley.github.io/jira-rest-java-client/releases/jira-rest-java-client-app-5.2.2-rtb-jar-with-dependencies.jar",
+      from "https://richardbradley.github.io/jira-rest-java-client/releases/jira-rest-java-client-app-5.2.2-rtb-jar-with-dependencies.jar"
+      notTransitive(),
 
     // Something weird is going on with Ivy here.
     "com.atlassian.sal" % "sal-api" % "3.0.7"
