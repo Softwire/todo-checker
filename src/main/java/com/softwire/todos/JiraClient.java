@@ -13,6 +13,7 @@ import com.atlassian.jira.rest.client.internal.json.JsonParser;
 import com.atlassian.jira.rest.client.internal.json.SearchResultJsonParser;
 import com.atlassian.jira.rest.client.internal.json.gen.CommentJsonGenerator;
 import com.atlassian.jira.rest.client.internal.json.gen.JsonGenerator;
+import com.google.common.collect.ImmutableSet;
 import io.atlassian.util.concurrent.Promise;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,7 +135,7 @@ public class JiraClient {
 
     public Set<Issue> searchIssuesWithComments(String jql) throws Exception {
         SearchResult searchResult = restClient.getSearchClient()
-                .searchJql(jql, 1000, null, Collections.singleton("comment")).get();
+                .searchJql(jql, 1000, null, ImmutableSet.of("comment", "status")).get();
 
         Set<Issue> issues = new LinkedHashSet<>();
         for (Issue issue : searchResult.getIssues()) {
