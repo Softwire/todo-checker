@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.core.UriBuilder;
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -68,13 +69,17 @@ public class JiraClient {
             checkArgument(config.getRestrictToSingleCardId().equals(key));
         }
 
-        Issue cached = issuesByKey.get(key);
-        if (cached == null) {
-            log.debug("Fetching card info for {}", key);
-            cached = restClient.getIssueClient().getIssue(key).get();
-            issuesByKey.put(key, cached);
+        try {
+            Issue cached = issuesByKey.get(key);
+            if (cached == null) {
+                log.debug("Fetching card info for {}", key);
+                cached = restClient.getIssueClient().getIssue(key).get();
+                issuesByKey.put(key, cached);
+            }
+            return cached;
+        } catch (Exception e) {
+            throw new IOException("Unable to fetch issue " + key, e);
         }
-        return cached;
     }
 
     public void addComment(Issue issue, Comment comment) throws Exception {
