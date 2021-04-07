@@ -16,7 +16,7 @@ public abstract class SourceControlLinkFormatter {
         }
 
         public String build(String file, int line) {
-            return String.format("%s/blob/master/%s#L%s", this.baseUrl, file, line);
+            return String.format("%s/blob/main/%s#L%s", this.baseUrl, file, line);
         }
     }
 
