@@ -24,3 +24,6 @@ resolvers ++= Seq(
   "atlassian-public4" at "https://m2proxy.atlassian.com/repository/public",
   "spring-plugins" at "https://repo.spring.io/plugins-release/"
 )
+
+// Pass through the app's exit code when using `sbt run`
+trapExit := false

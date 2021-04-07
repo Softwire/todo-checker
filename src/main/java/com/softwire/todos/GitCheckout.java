@@ -1,5 +1,6 @@
 package com.softwire.todos;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
@@ -18,7 +19,7 @@ public class GitCheckout {
     private final File baseDir;
     private final SourceControlLinkFormatter linkFormatter;
     private static final Pattern GITHUB_URL_PAT = Pattern.compile(
-        "git@(?<hostname>(github|gitlab)\\.[\\w.-]+):(?<path>.*)\\.git");
+            "git@(?<hostname>(github|gitlab)\\.[\\w.-]+):(?<path>.*)\\.git");
 
     public GitCheckout(File baseDir, Config config) throws Exception {
         this.baseDir = baseDir;
@@ -30,13 +31,15 @@ public class GitCheckout {
     }
 
     private SourceControlLinkFormatter createLinkFormatter(
-        Config config)
-        throws Exception {
+            Config config)
+            throws Exception {
+
+        String gitBranchName = determineGitBranchName();
 
         if (config.getGitblitUrl() != null) {
-            return new SourceControlLinkFormatter.Gitblit(config.getGitblitUrl());
+            return new SourceControlLinkFormatter.Gitblit(config.getGitblitUrl(), gitBranchName);
         } else if (config.getGithubUrl() != null) {
-            return new SourceControlLinkFormatter.Github(config.getGithubUrl());
+            return new SourceControlLinkFormatter.Github(config.getGithubUrl(), gitBranchName);
         } else {
             // Auto-detect
             try {
@@ -46,16 +49,29 @@ public class GitCheckout {
                 Matcher matcher = GITHUB_URL_PAT.matcher(originUrl);
                 checkArgument(matcher.matches());
                 String githubUrl = String.format(
-                    "https://%s/%s",
-                    matcher.group("hostname"),
-                    matcher.group("path"));
-                return new SourceControlLinkFormatter.Github(githubUrl);
+                        "https://%s/%s",
+                        matcher.group("hostname"),
+                        matcher.group("path"));
+                return new SourceControlLinkFormatter.Github(githubUrl, gitBranchName);
             } catch (Exception e) {
                 throw new ConfigException(
-                    "Unable to auto-detect a GitHub or GitLab URL for this checkout. " +
-                        "Please specify --github-url or --gitblit-url or fix the cause",
-                    e);
+                        "Unable to auto-detect a GitHub or GitLab URL for this checkout. " +
+                                "Please specify --github-url or --gitblit-url or fix the cause",
+                        e);
             }
+        }
+    }
+
+    public String determineGitBranchName() throws Exception {
+        // On Jenkins, $GIT_BRANCH will be e.g. origin/master
+        String gitBranchEnv = System.getenv("GIT_BRANCH");
+        if (gitBranchEnv != null) {
+            Matcher matcher = Pattern.compile("origin/(.*)")
+                    .matcher(gitBranchEnv);
+            Preconditions.checkState(matcher.matches());
+            return matcher.group(1);
+        } else {
+            return Iterables.getOnlyElement(git("symbolic-ref", "--short", "HEAD"));
         }
     }
 
@@ -79,7 +95,7 @@ public class GitCheckout {
 
         ArrayList<String> output = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(
-            new InputStreamReader(process.getInputStream()))) {
+                new InputStreamReader(process.getInputStream()))) {
 
             String line;
             while ((line = reader.readLine()) != null) {
@@ -88,10 +104,10 @@ public class GitCheckout {
             int ret = process.waitFor();
             if (ret != 0) {
                 throw new IOException(String.format(
-                    "exec \"%s\" failed with code %s. Output was:\n%s",
-                    String.join(" ", cmd),
-                    ret,
-                    String.join("\n", output)));
+                        "exec \"%s\" failed with code %s. Output was:\n%s",
+                        String.join(" ", cmd),
+                        ret,
+                        String.join("\n", output)));
             }
             return output;
         }
@@ -99,9 +115,9 @@ public class GitCheckout {
 
     public interface Config {
         String getGithubUrl();
+
         String getGitblitUrl();
     }
-
 
     private static class ConfigException extends Exception {
         ConfigException(String message, Exception cause) {
