@@ -21,7 +21,7 @@ safe in the knowledge those TODOs will never get forgotten.
 
 ### Funtionality
 
-Running his tool will:
+Running this tool will:
 
 1. Update the JIRA cards with a comment listing any code TODOs
 which are pending against that card.
@@ -52,3 +52,12 @@ And link them to the jira ticket AAA-47.
 
 CAUTION: you should not run this project unless you really know what you
 are doing; it will make lots of changes to your live JIRA.
+
+#### Multi-repository projects
+
+If you have many Git repositories but only one Jira project then run the tool several times, once per project, and use the `--job-name` flag to distinguish them:
+
+```
+sbt run --src ../project-A --job-name ProjectA
+sbt run --src ../project-B --job-name ProjectB
+```
