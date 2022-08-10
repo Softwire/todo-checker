@@ -2,9 +2,7 @@
 
 [![Build Status](https://travis-ci.org/Softwire/todo-checker.svg?branch=master)](https://travis-ci.org/Softwire/todo-checker)
 
-This tool checks for TODOs and matches them to JIRA cards.
-
-Based entirely on [@RichardBradley](https://github.com/richardbradley)'s various todo-checkers from various different Softwire projects.
+This tool checks for TODOs in code and ensures that they are linked to JIRA cards.
 
 ### Workflow
 
@@ -19,7 +17,7 @@ Setting up a Jenkins or other regular CI build that runs this tool will give you
 freedom to safely use TODOs to mark pending work directly in the codebase,
 safe in the knowledge those TODOs will never get forgotten.
 
-### Funtionality
+### Functionality
 
 Running his tool will:
 
@@ -52,3 +50,11 @@ And link them to the jira ticket AAA-47.
 
 CAUTION: you should not run this project unless you really know what you
 are doing; it will make lots of changes to your live JIRA.
+The code will not write to JIRA unless you pass `--write-to-jira`; it runs
+in a dry-run mode by default.
+
+### Exclusions
+
+Add the string `todo-checker-ignore` to a line to ignore it.
+
+Use the `--exclude-path-regex` argument to exclude files or directories.

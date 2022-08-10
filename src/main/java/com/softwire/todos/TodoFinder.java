@@ -33,6 +33,7 @@ public class TodoFinder {
 
         return matches.stream()
                 .filter(x -> excludePat == null || !excludePat.matcher(x).find())
+                .filter(x -> !x.contains("todo-checker-ignore"))
                 .map(this::gitGrepLineToTodo)
                 .collect(toList());
     }
