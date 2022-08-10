@@ -93,15 +93,15 @@ public class JiraClient {
         }
     }
 
-    public void updateComment(Comment comment) throws Exception {
+    public void updateComment(Issue issue, Comment comment) throws Exception {
         if (config.getWriteToJira()) {
-            log.info("Updating comment {}", comment.getSelf());
+            log.info("Updating comment on {}", issue.getKey());
 
             restClient.getIssueClient()
                     .updateComment(comment)
                     .get();
         } else {
-            log.info("Not updating comment {}:\n{}", comment.getSelf(), comment.getBody());
+            log.info("Not updating comment on {}:\n{}", issue.getKey(), comment.getBody());
         }
     }
 

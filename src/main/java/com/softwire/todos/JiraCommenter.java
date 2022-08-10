@@ -64,6 +64,7 @@ public class JiraCommenter {
                         Comment.valueOf(commentText));
             } else if (!existingComment.getBody().equals(commentText)) {
                 jiraClient.updateComment(
+                        issue,
                         new Comment(
                                 existingComment.getSelf(),
                                 commentText,
