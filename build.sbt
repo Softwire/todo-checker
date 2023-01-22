@@ -9,10 +9,10 @@ libraryDependencies ++= {
     "com.atlassian.jira" % "jira-rest-java-client-app" % "5.2.2-rtb"
       notTransitive()
       from "https://richardbradley.github.io/jira-rest-java-client/releases/jira-rest-java-client-app-5.2.2-rtb-jar-with-dependencies.jar",
-
+    "com.slack.api" % "slack-api-client" % "1.27.3",
     "args4j" % "args4j" % "2.33",
     "junit" % "junit" % "4.4" % Test,
-    "com.novocode" % "junit-interface" % "0.11" % Test exclude("junit", "junit-dep")
+    "com.novocode" % "junit-interface" % "0.11" % Test exclude("junit", "junit-dep"),
   )
 }
 

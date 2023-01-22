@@ -32,7 +32,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * CLI entry point to the `TodoChecker` tool.
  */
 public class TodoCheckerMain
-        implements JiraClient.Config, JiraCommenter.Config, GitCheckout.Config {
+        implements JiraClient.Config, JiraCommenter.Config, GitCheckout.Config, SlackClient.Config {
 
     /// Command-line arguments
 
@@ -113,6 +113,16 @@ public class TodoCheckerMain
     @Option(name = "--report-file",
             usage = "Write report of errors to this file as well as to the console.")
     public String reportFile = null;
+
+    @Option(name = "--slack-channel",
+            usage = "Post report of errors to this slack channel as well as to the console.",
+            depends={"--slack-token"})
+    public String slackChannel = null;
+
+    @Option(name = "--slack-token",
+            usage = "Slack Token used to Authenticate with Slack API.",
+            depends={"--slack-channel"})
+    public String slackToken = null;
     /// End config
 
     private JiraClient jiraClient;
@@ -184,8 +194,22 @@ public class TodoCheckerMain
         boolean success = findTodosOnClosedCards(todosByIssue, jiraClient);
         success &= findTodosWithoutACardNumber(todosByIssue);
 
+        String errorReportContent = errorReport.toString();
         if (reportFile != null) {
-            Files.write(Paths.get(reportFile), errorReport.toString().getBytes(StandardCharsets.UTF_8));
+            Files.write(Paths.get(reportFile), errorReportContent.getBytes(StandardCharsets.UTF_8));
+        }
+
+        if (slackChannel != null) {
+            SlackClient slackClient = new SlackClient(this);
+            if (success) {
+                slackClient.postMessage(
+                    ":white_check_mark: TODO Checker successful: no TODOs without JIRA cards or TODOs on closed cards."
+                );
+            } else {
+                slackClient.postMessage(
+                    ":x: TODO Checker failed \n" + errorReportContent
+                );
+            }
         }
 
         return success;
@@ -358,5 +382,15 @@ public class TodoCheckerMain
     @Override
     public String getJiraPassword() {
         return jiraPassword;
+    }
+
+    @Override
+    public String getSlackChannel() {
+        return slackChannel;
+    }
+
+    @Override
+    public String getSlackToken() {
+        return slackToken;
     }
 }
