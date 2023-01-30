@@ -19,7 +19,7 @@ safe in the knowledge those TODOs will never get forgotten.
 
 ## Functionality
 
-Running his tool will:
+Running this tool will:
 
 1. Update the JIRA cards with a comment listing any code TODOs
 which are pending against that card.
@@ -69,3 +69,14 @@ containing details of TODO cards which are closed or in review.
 Add the string `todo-checker-ignore` to a line to ignore it.
 
 Use the `--exclude-path-regex` argument to exclude files or directories.
+
+#### Multi-repository projects
+
+If you have many Git repositories but only one Jira project (or
+want to track multiple branches) then run the tool several times,
+once per project, and use the `--job-name` flag to distinguish them:
+
+```
+sbt run --src ../project-A --job-name ProjectA
+sbt run --src ../project-B --job-name ProjectB
+```
