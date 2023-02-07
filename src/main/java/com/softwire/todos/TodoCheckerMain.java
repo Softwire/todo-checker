@@ -78,9 +78,9 @@ public class TodoCheckerMain
     public List<JiraProject> ignoredJiraProjects = new ArrayList<>();
 
     @Option(name = "--github-url",
-            usage = "OPTIONAL (omit this to auto-detect, especially if you are scanning multiple checkouts)." +
-                    "\nThe url of the project in github, e.g. https://github.com/softwire/todo-checker" +
-                    "\nGitLab uses the same URL format, so use this arg if you use GitLab.",
+            usage = "OPTIONAL (omit this to auto-detect, especially if you are scanning multiple checkouts). " +
+                    "The url of the project in github, e.g. https://github.com/softwire/todo-checker. " +
+                    "GitLab uses the same URL format, so use this arg if you use GitLab.",
             forbids = "--gitblit-url")
     public String githubUrl;
 
