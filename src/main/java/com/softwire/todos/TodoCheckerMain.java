@@ -135,14 +135,18 @@ public class TodoCheckerMain
     public static void main(String[] args) throws Exception {
         TodoCheckerMain app = new TodoCheckerMain();
         CmdLineParser parser = new CmdLineParser(app);
-        boolean success;
+        TodoCheckerReturnCode returnCode;
         try {
             parser.parseArgument(args);
-            success = app.run();
+            if(app.run()) {
+                returnCode = TodoCheckerReturnCode.SUCCESS;
+            } else {
+                returnCode = TodoCheckerReturnCode.FOUND_INAPPROPRIATE_TODOS;
+            }
         } catch (CmdLineException e) {
             System.err.println(e.getMessage());
             parser.printUsage(System.err);
-            success = false;
+            returnCode = TodoCheckerReturnCode.INCORRECT_CLI_ARG;
         } catch (RestClientException e) {
             if (e.getMessage().contains("Client response status: 401")) {
                 System.err.println(
@@ -153,7 +157,7 @@ public class TodoCheckerMain
             throw e;
         }
 
-        System.exit(success ? 0 : 1);
+        System.exit(returnCode.getValue());
     }
 
     private boolean run() throws Exception {
