@@ -13,7 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -35,6 +34,8 @@ public class TodoCheckerMain
         implements JiraClient.Config, JiraCommenter.Config, GitCheckout.Config, SlackClient.Config {
 
     /// Command-line arguments
+
+    private static final List<String> DEFAULT_INVALID_CARD_STATUSES = List.of("In Test", "Passed test", "UAT", "Done");
 
     @Option(name = "--write-to-jira",
             usage = "Unless this is set, no changes will be made in JIRA")
@@ -99,6 +100,14 @@ public class TodoCheckerMain
             required = true)
     public String jiraPassword;
 
+    // args4j doesn't provide a way to default a multivalued field: if you provide a default here then any further
+    // values from CLI arguments be added to the field, rather than replacing it.  Hence, we have to do the defaulting
+    // later.
+    @Option(name = "--invalid-card-status",
+            usage = "If a TODO is found against a JIRA card with one of these statuses, the TODO checker will report" +
+                    "an error.  By default these are \"In Test\", \"Passed test\", \"UAT\", and \"Done\".")
+    public List<String> invalidCardStatuses = null;
+
     @Option(name = "--exclude-path-regex",
             usage = "Any paths to exclude, by regex, e.g. '^(node_modules/|broken-code/)'",
             required = false)
@@ -157,6 +166,11 @@ public class TodoCheckerMain
     }
 
     private boolean run() throws Exception {
+        // We have to provide the default ourselves for the invalidCardStatuses, see comment by the @Option.
+        if (invalidCardStatuses == null) {
+            invalidCardStatuses = DEFAULT_INVALID_CARD_STATUSES;
+        }
+        log.info(String.join(", ", invalidCardStatuses));
         this.jiraClient = new JiraClient(this);
 
         if (!writeToJira) {
@@ -298,11 +312,7 @@ public class TodoCheckerMain
                 ok = false;
             }
 
-            switch (issue.getStatus().getName()) {
-                case "In Test":
-                case "Passed test":
-                case "UAT":
-                case "Done":
+            if (invalidCardStatuses.contains(issue.getStatus().getName())) {
                     logAndReportError("TODOs on a JIRA card with status '%s': %s",
                                       issue.getStatus().getName(),
                                       jiraClient.getViewUrl(issue));
