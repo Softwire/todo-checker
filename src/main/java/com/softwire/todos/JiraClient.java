@@ -1,30 +1,22 @@
 package com.softwire.todos;
 
-import com.atlassian.httpclient.api.HttpClient;
 import com.atlassian.jira.rest.client.api.JiraRestClient;
 import com.atlassian.jira.rest.client.api.domain.Comment;
 import com.atlassian.jira.rest.client.api.domain.Issue;
 import com.atlassian.jira.rest.client.api.domain.SearchResult;
 import com.atlassian.jira.rest.client.api.domain.ServerInfo;
-import com.atlassian.jira.rest.client.internal.async.AbstractAsynchronousRestClient;
 import com.atlassian.jira.rest.client.internal.async.AsynchronousJiraRestClientFactory;
-import com.atlassian.jira.rest.client.internal.async.AsynchronousSearchRestClient;
-import com.atlassian.jira.rest.client.internal.json.JsonParser;
-import com.atlassian.jira.rest.client.internal.json.SearchResultJsonParser;
-import com.atlassian.jira.rest.client.internal.json.gen.CommentJsonGenerator;
-import com.atlassian.jira.rest.client.internal.json.gen.JsonGenerator;
 import com.google.common.collect.ImmutableSet;
-import io.atlassian.util.concurrent.Promise;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.ws.rs.core.UriBuilder;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.*;
-import java.util.concurrent.ExecutionException;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -38,7 +30,7 @@ public class JiraClient {
 
     private final Config config;
     private final JiraRestClient restClient;
-    private Map<String, Issue> issuesByKey = new HashMap<>();
+    private final Map<String, Issue> issuesByKey = new HashMap<>();
     private final Logger log = LoggerFactory.getLogger(getClass());
     private ServerInfo serverInfo;
 
@@ -105,27 +97,6 @@ public class JiraClient {
         }
     }
 
-    /**
-     * This wrapper just exposes somes protected methods
-     */
-    private class ClientWrapper extends AbstractAsynchronousRestClient {
-        public ClientWrapper(AbstractAsynchronousRestClient inner) throws Exception {
-            super(getApacheClient(inner));
-        }
-
-        public <T> Promise<Void> put2(final URI uri, final T entity, final JsonGenerator<T> jsonGenerator) {
-            return super.put(uri, entity, jsonGenerator);
-        }
-
-        public final Promise<Void> delete2(final URI uri) {
-            return delete(uri);
-        }
-
-        public <T> Promise<T> getAndParse2(final URI uri, final JsonParser<?, T> parser) {
-            return getAndParse(uri, parser);
-        }
-    }
-
     public void deleteComment(Issue issue, Comment comment) throws Exception {
         if (config.getWriteToJira()) {
             log.info("Deleting comment on {}", issue.getKey());
@@ -153,12 +124,6 @@ public class JiraClient {
 
     public String getViewUrl(Issue issue) throws Exception {
         return new URI(config.getJiraUrl()).resolve("browse/" + issue.getKey()).toString();
-    }
-
-    private HttpClient getApacheClient(AbstractAsynchronousRestClient client) throws Exception {
-        Field field = AbstractAsynchronousRestClient.class.getDeclaredField("client");
-        field.setAccessible(true);
-        return (HttpClient) field.get(client);
     }
 
     public interface Config {
