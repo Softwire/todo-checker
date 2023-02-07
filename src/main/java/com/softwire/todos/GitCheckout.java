@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,7 +45,7 @@ public class GitCheckout {
             // Auto-detect
             try {
                 // (In Git >= 2.7.0 we could do "git remote get-url origin")
-                List<String> output = git("ls-remote", "--get-url", "origin");
+                List<String> output = git(List.of("ls-remote", "--get-url", "origin"));
                 String originUrl = Iterables.getOnlyElement(output);
                 Matcher matcher = GITHUB_URL_PAT.matcher(originUrl);
                 checkArgument(matcher.matches());
@@ -71,18 +72,25 @@ public class GitCheckout {
             Preconditions.checkState(matcher.matches());
             return matcher.group(1);
         } else {
-            return Iterables.getOnlyElement(git("symbolic-ref", "--short", "HEAD"));
+            return Iterables.getOnlyElement(git(List.of("symbolic-ref", "--short", "HEAD")));
         }
     }
 
     /**
      * Runs the `git` command with the given args in this checkout and returns the output
      */
-    public List<String> git(String... args) throws Exception {
-        return exec(Lists.asList("git", args).toArray(new String[0]));
+    public List<String> git(List<String> cmd) throws Exception {
+        return git(cmd, Set.of(0));
     }
 
-    private List<String> exec(String... cmd) throws Exception {
+    public List<String> git(List<String> cmd, Set<Integer> expectedReturnCodes) throws Exception {
+        List<String> completeCommand = new ArrayList<>();
+        completeCommand.add("git");
+        completeCommand.addAll(cmd);
+        return exec(completeCommand, expectedReturnCodes);
+    }
+
+    private List<String> exec(List<String> cmd, Set<Integer> expectedReturnCodes) throws Exception {
         ProcessBuilder builder = new ProcessBuilder(cmd);
         // This simplifies threading, as it avoids deadlock on stderr blocking
         builder.redirectErrorStream(true);
@@ -102,7 +110,7 @@ public class GitCheckout {
                 output.add(line);
             }
             int ret = process.waitFor();
-            if (ret != 0) {
+            if (!expectedReturnCodes.contains(ret)) {
                 throw new IOException(String.format(
                         "exec \"%s\" failed with code %s. Output was:\n%s",
                         String.join(" ", cmd),

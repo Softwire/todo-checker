@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,7 +28,9 @@ public class TodoFinder {
     public List<CodeTodo> findAllTodosInSource(String excludePathRegex) throws Exception {
         // We use "git grep" since it will automatically search only in committed
         // files without needing any complicated features.
-        List<String> matches = gitCheckout.git("grep", "-iIwn", "to" + "do");
+        // git grep will return 0 if any matching lines found, 1 if no matching lines were found, and
+        // 2 otherwise, see https://www.gnu.org/software/grep/manual/html_node/Exit-Status.html.
+        List<String> matches = gitCheckout.git(List.of("grep", "-iIwn", "todo"), Set.of(0, 1));  // todo-checker-ignore
 
         Pattern excludePat = excludePathRegex == null ? null : Pattern.compile(excludePathRegex);
 
