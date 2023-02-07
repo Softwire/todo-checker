@@ -2,7 +2,6 @@ package com.softwire.todos;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -15,6 +14,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Arrays.asList;
+import static java.util.Collections.singleton;
 
 public class GitCheckout {
     private final File baseDir;
@@ -45,7 +46,7 @@ public class GitCheckout {
             // Auto-detect
             try {
                 // (In Git >= 2.7.0 we could do "git remote get-url origin")
-                List<String> output = git(List.of("ls-remote", "--get-url", "origin"));
+                List<String> output = git(asList("ls-remote", "--get-url", "origin"));
                 String originUrl = Iterables.getOnlyElement(output);
                 Matcher matcher = GITHUB_URL_PAT.matcher(originUrl);
                 checkArgument(matcher.matches());
@@ -72,7 +73,7 @@ public class GitCheckout {
             Preconditions.checkState(matcher.matches());
             return matcher.group(1);
         } else {
-            return Iterables.getOnlyElement(git(List.of("symbolic-ref", "--short", "HEAD")));
+            return Iterables.getOnlyElement(git(asList("symbolic-ref", "--short", "HEAD")));
         }
     }
 
@@ -80,7 +81,7 @@ public class GitCheckout {
      * Runs the `git` command with the given args in this checkout and returns the output
      */
     public List<String> git(List<String> cmd) throws Exception {
-        return git(cmd, Set.of(0));
+        return git(cmd, singleton(0));
     }
 
     public List<String> git(List<String> cmd, Set<Integer> expectedReturnCodes) throws Exception {

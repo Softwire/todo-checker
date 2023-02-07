@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Arrays.asList;
 
 /**
  * CLI entry point to the `TodoChecker` tool.
@@ -35,7 +36,7 @@ public class TodoCheckerMain
 
     /// Command-line arguments
 
-    private static final List<String> DEFAULT_INVALID_CARD_STATUSES = List.of("In Test", "Passed test", "UAT", "Done");
+    private static final List<String> DEFAULT_INVALID_CARD_STATUSES = asList("In Test", "Passed test", "UAT", "Done");
 
     @Option(name = "--write-to-jira",
             usage = "Unless this is set, no changes will be made in JIRA")

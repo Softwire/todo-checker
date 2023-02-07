@@ -1,3 +1,5 @@
+javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
+
 libraryDependencies ++= {
 
   // https://github.com/sbt/sbt/issues/3618
