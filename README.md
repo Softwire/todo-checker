@@ -56,6 +56,14 @@ are doing; it will make lots of changes to your live JIRA.
 The code will not write to JIRA unless you pass `--write-to-jira`; it runs
 in a dry-run mode by default.
 
+### Return codes
+
+The TODO checker will return:
+* 0 on success
+* 1 on unexpected error
+* 2 on incorrect use of CLI arguments
+* 3 if in TODOs were found without JIRA cards or against JIRA cards in an invalid state. 
+
 ### Reporting
 
 Pass the `--report-file <file-path>` argument to generate a report file containing 
