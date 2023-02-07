@@ -129,7 +129,7 @@ public class TodoCheckerMain
     private final Logger log = LoggerFactory.getLogger(getClass());
     private final StringBuilder errorReport = new StringBuilder();
 
-    public TodoCheckerMain() throws URISyntaxException {
+    public TodoCheckerMain() {
     }
 
     public static void main(String[] args) throws Exception {
