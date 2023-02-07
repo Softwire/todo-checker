@@ -70,13 +70,20 @@ Add the string `todo-checker-ignore` to a line to ignore it.
 
 Use the `--exclude-path-regex` argument to exclude files or directories.
 
-#### Multi-repository projects
+### Multi-repository projects
 
 If you have many Git repositories but only one Jira project (or
-want to track multiple branches) then run the tool several times,
-once per project, and use the `--job-name` flag to distinguish them:
+want to track multiple branches) then either:
 
-```
-sbt run --src ../project-A --job-name ProjectA
-sbt run --src ../project-B --job-name ProjectB
-```
+1. Run the tool several times, once per project, and use the `--job-name` flag to distinguish them:
+    
+    ```
+    sbt run --src ../project-A --job-name ProjectA --jira-project AAA
+    sbt run --src ../project-B --job-name ProjectB --jira-project AAA
+    ```
+    This method is suitable if you have a build per repository, for example. 
+2. Or run the tool once passing the `--src` command multiple times:
+   ```
+   sbt run --src ../project-A --src ../project-B --jira-project AAA
+   ```
+   This method is suitable if you have a build across all your repositories, for example.
