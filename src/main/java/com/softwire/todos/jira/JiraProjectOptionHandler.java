@@ -1,4 +1,4 @@
-package com.softwire.todos;
+package com.softwire.todos.jira;
 
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;

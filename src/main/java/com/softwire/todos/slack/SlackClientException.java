@@ -1,4 +1,4 @@
-package com.softwire.todos;
+package com.softwire.todos.slack;
 
 public class SlackClientException extends Exception {
     public SlackClientException(String message) {

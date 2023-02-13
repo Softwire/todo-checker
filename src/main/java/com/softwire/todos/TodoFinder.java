@@ -1,11 +1,10 @@
 package com.softwire.todos;
 
-import com.google.common.collect.Sets;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -15,7 +14,7 @@ import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toList;
 
 public class TodoFinder {
-
+    private final Logger log = LoggerFactory.getLogger(getClass());
     private static final Pattern GREP_LINE_PATT = Pattern.compile(
             "([^:]+):(\\d+):(.*)");
     private final GitCheckout gitCheckout;
@@ -25,6 +24,8 @@ public class TodoFinder {
     }
 
     public List<CodeTodo> findAllTodosInSource(String excludePathRegex) throws Exception {
+        log.info("Scanning {}", gitCheckout.getBaseDir());
+
         // We use "git grep" since it will automatically search only in committed
         // files without needing any complicated features.
         // git grep will return 0 if any matching lines found, 1 if no matching lines were found, and

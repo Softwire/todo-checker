@@ -1,11 +1,12 @@
-package com.softwire.todos;
+package com.softwire.todos.slack;
 import com.slack.api.Slack;
 import com.slack.api.methods.MethodsClient;
 import com.slack.api.methods.request.chat.ChatPostMessageRequest;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
-import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.slack.api.model.block.SectionBlock;
+import com.slack.api.model.block.composition.MarkdownTextObject;
+
+import static java.util.Arrays.asList;
 
 public class SlackClient {
     // The maximum message length of a Slack message is 40K chars
@@ -27,7 +28,7 @@ public class SlackClient {
 
         ChatPostMessageRequest request = ChatPostMessageRequest.builder()
                 .channel(config.getSlackChannel())
-                .text(message)
+                .blocks(asList(SectionBlock.builder().text(MarkdownTextObject.builder().text(message).build()).build()))
                 .build();
 
         ChatPostMessageResponse response;

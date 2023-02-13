@@ -1,4 +1,4 @@
-package com.softwire.todos;
+package com.softwire.todos.jira;
 
 import java.util.regex.Pattern;
 
@@ -19,7 +19,7 @@ public class JiraProject {
         return regex;
     }
 
-    Pattern getIssueIdPattern() {
+    public Pattern getIssueIdPattern() {
         return Pattern.compile(
             "\\b(" + getRegex() + ")[-_:](?<id>[0-9]+)",
             Pattern.CASE_INSENSITIVE);

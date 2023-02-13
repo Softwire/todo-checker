@@ -1,6 +1,7 @@
-package com.softwire.todos;
+package com.softwire.todos.jira;
 
 import com.atlassian.jira.rest.client.api.domain.ServerInfo;
+import com.softwire.todos.jira.JiraClient;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpContext;
 import com.sun.net.httpserver.HttpServer;
