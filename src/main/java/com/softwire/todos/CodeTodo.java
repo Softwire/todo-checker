@@ -2,7 +2,7 @@ package com.softwire.todos;
 
 import java.io.File;
 
-class CodeTodo {
+public class CodeTodo {
     private final File file;
     private final int lineNumber;
     private final String line;
@@ -18,6 +18,16 @@ class CodeTodo {
 
     public File getFile() {
         return this.file;
+    }
+
+    public String getPosixPath() {
+        return file.getPath().replace('\\', '/');
+    }
+
+    public String getSourceControlLinkUrl() {
+        return getContainingGitCheckout()
+                .getSourceControlLinkFormatter()
+                .build(getPosixPath(), getLineNumber());
     }
 
     public int getLineNumber() {

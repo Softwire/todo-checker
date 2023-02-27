@@ -1,9 +1,10 @@
-package com.softwire.todos;
+package com.softwire.todos.jira;
 
 import com.atlassian.jira.rest.client.api.domain.Comment;
 import com.atlassian.jira.rest.client.api.domain.Issue;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
+import com.softwire.todos.CodeTodo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,11 +111,7 @@ public class JiraCommenter {
     }
 
     private String commentText(CodeTodo value) {
-        String path = value.getFile().getPath().replace('\\', '/');
-
-        String linkUrl = value.getContainingGitCheckout()
-                .getSourceControlLinkFormatter()
-                .build(path, value.getLineNumber());
+        String linkUrl = value.getSourceControlLinkUrl();
 
         String escapedCodeLine = value.getLine()
                 .replace("|", "\\|")
@@ -143,12 +140,12 @@ public class JiraCommenter {
             return String.format(
                     "* [(view)|%s] {{%s:%s}}",
                     linkUrl,
-                    path,
+                    value.getPosixPath(),
                     escapedCodeLine);
         } else {
             return String.format(
                     " * {{[%s:%s|%s]}}",
-                    path,
+                    value.getPosixPath(),
                     escapedCodeLine,
                     linkUrl);
         }
@@ -161,7 +158,7 @@ public class JiraCommenter {
                 .orNull();
     }
 
-    interface Config {
+    public interface Config {
         List<JiraProject> getJiraProjects();
 
         String getJobName();

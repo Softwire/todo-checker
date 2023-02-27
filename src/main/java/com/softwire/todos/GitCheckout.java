@@ -32,6 +32,10 @@ public class GitCheckout {
         return linkFormatter;
     }
 
+    public File getBaseDir() {
+        return baseDir;
+    }
+
     private SourceControlLinkFormatter createLinkFormatter(
             Config config)
             throws Exception {

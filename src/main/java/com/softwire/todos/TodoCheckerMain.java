@@ -1,411 +1,101 @@
 package com.softwire.todos;
 
 import com.atlassian.jira.rest.client.api.RestClientException;
-import com.atlassian.jira.rest.client.api.domain.Issue;
-import com.atlassian.jira.rest.client.api.domain.Resolution;
-import com.google.common.base.Joiner;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Multimap;
+import com.softwire.todos.jira.JiraClient;
+import com.softwire.todos.jira.JiraCommenter;
+import com.softwire.todos.reporter.FileReporter;
+import com.softwire.todos.reporter.Reporter;
+import com.softwire.todos.reporter.SlackReporter;
+import com.softwire.todos.slack.SlackClient;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
+import java.net.URISyntaxException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
-import static java.util.Arrays.asList;
 
-/**
- * CLI entry point to the `TodoChecker` tool.
- */
-public class TodoCheckerMain
-        implements JiraClient.Config, JiraCommenter.Config, GitCheckout.Config, SlackClient.Config {
-
-    /// Command-line arguments
-
-    private static final List<String> DEFAULT_INVALID_CARD_STATUSES = asList("In Test", "Passed test", "UAT", "Done");
-
-    @Option(name = "--write-to-jira",
-            usage = "Unless this is set, no changes will be made in JIRA")
-    public boolean writeToJira = false;
+public class TodoCheckerMain {
 
     /**
-     * If this is set, only the specified card will be acted on
+     * CLI entry point to the `TodoChecker` tool.
      */
-    @Option(name = "--only-card",
-            usage = "Set this to a JIRA card id to only operate on that one card.")
-    public String restrictToSingleCardId = null;
-
-    @Option(name = "--src",
-            usage = "The directory to scan for TODOs (must be in a git checkout). " +
-                    "Pass this arg multiple times for multiple projects.",
-            required = true)
-    public List<String> srcDirs;
-
-    @Option(name = "--jira-url",
-            usage = "The base url for jira with trailing slash, defaults to https://jira.softwire.com/jira/",
-            required = false)
-    public String jiraUrl = "https://jira.softwire.com/jira/";
-
-    @Option(name = "--jira-project-key",
-            usage = "The project key for JIRA, e.g. AAA, INTRO, PROJECTX, etc.  Pass this flag multiple times for " +
-                    "multiple projects.  If you need to use a regex other than the project key when looking for the " +
-                    "card key in a todo comment, then pass it here with an \"=\". For example if your JIRA project " +
-                    "key is something long like COMPANY-DEPT-FOO but your team writes TODOs like " +
-                    "\"TODO:FOO-123\", then pass \"--jira-project COMPANY-DEPT-FOO=FOO\"\n" +
-                    "You can also use a regex, e.g. \"--jira-project COMPANY-DEPT-FOO=FOO|DEPT-FOO\"",
-            required = true,
-            handler = JiraProjectOptionHandler.class)
-    public List<JiraProject> jiraProjects = new ArrayList<>();
-
-    @Option(name = "--ignore-jira-project-key",
-            usage = "A JIRA project key to ignore, e.g. AAA, INTRO, PROJECTX, etc. Pass this flag multiple times for " +
-                    "multiple projects. You can use this if your project uses multiple JIRA instances. Any TODOs which " +
-                    "reference this JIRA project will not count as untracked TODOs, but no JIRA comments will be updated " +
-                    "for them.",
-            handler = JiraProjectOptionHandler.class)
-    public List<JiraProject> ignoredJiraProjects = new ArrayList<>();
-
-    @Option(name = "--github-url",
-            usage = "OPTIONAL (omit this to auto-detect, especially if you are scanning multiple checkouts). " +
-                    "The url of the project in github, e.g. https://github.com/softwire/todo-checker. " +
-                    "GitLab uses the same URL format, so use this arg if you use GitLab.",
-            forbids = "--gitblit-url")
-    public String githubUrl;
-
-    @Option(name = "--gitblit-url",
-            usage = "The url of the project in gitblit, e.g. https://example.com/gitblit?r=todo-checker.git",
-            forbids = "--github-url")
-    public String gitblitUrl;
-
-    @Option(name = "--jira-username",
-            usage = "The username of the Jira user who will comment on Jira tickets, e.g. sjw",
-            required = true)
-    public String jiraUsername;
-
-    @Option(name = "--jira-password",
-            usage = "The password of the Jira user who will comment on Jira tickets",
-            required = true)
-    public String jiraPassword;
-
-    // args4j doesn't provide a way to default a multivalued field: if you provide a default here then any further
-    // values from CLI arguments be added to the field, rather than replacing it.  Hence, we have to do the defaulting
-    // later.
-    @Option(name = "--invalid-card-status",
-            usage = "If a TODO is found against a JIRA card with one of these statuses, the TODO checker will report" +
-                    "an error.  By default these are \"In Test\", \"Passed test\", \"UAT\", and \"Done\".")
-    public List<String> invalidCardStatuses = null;
-
-    @Option(name = "--exclude-path-regex",
-            usage = "Any paths to exclude, by regex, e.g. '^(node_modules/|broken-code/)'",
-            required = false)
-    public String excludePathRegex;
-
-    @Option(name = "--job-name",
-            usage = "Job name.  This will be prefixed to all JIRA comments.  You must set this to a unique value if " +
-                    "you have multiple jobs running against different codebases but with the same JIRA project, " +
-                    "otherwise the jobs will interfere with each other.")
-    public String jobName = null;
-
-    @Option(name = "--report-file",
-            usage = "Write report of errors to this file as well as to the console.")
-    public String reportFile = null;
-
-    @Option(name = "--slack-channel",
-            usage = "Post report of errors to this slack channel as well as to the console.",
-            depends={"--slack-token"})
-    public String slackChannel = null;
-
-    @Option(name = "--slack-token",
-            usage = "Slack Token used to Authenticate with Slack API.",
-            depends={"--slack-channel"})
-    public String slackToken = null;
-    /// End config
-
-    private JiraClient jiraClient;
-    private final Logger log = LoggerFactory.getLogger(getClass());
-    private final StringBuilder errorReport = new StringBuilder();
-
-    public TodoCheckerMain() {
-    }
-
     public static void main(String[] args) throws Exception {
-        TodoCheckerMain app = new TodoCheckerMain();
-        CmdLineParser parser = new CmdLineParser(app);
+        Logger log = LoggerFactory.getLogger(TodoCheckerMain.class);
         TodoCheckerReturnCode returnCode;
+
+        TodoCheckerConfig config = new TodoCheckerConfig();
+        CmdLineParser parser = new CmdLineParser(config);
         try {
             parser.parseArgument(args);
+        } catch (CmdLineException e) {
+            log.error(e.getMessage());
+            parser.printUsage(System.err);
+            System.exit(TodoCheckerReturnCode.INCORRECT_CLI_ARG.getValue());
+        }
+
+        config.applyDefaults();
+        TodoCheckerApp app = todoCheckerApp(config);
+
+        try {
             if(app.run()) {
                 returnCode = TodoCheckerReturnCode.SUCCESS;
             } else {
                 returnCode = TodoCheckerReturnCode.FOUND_INAPPROPRIATE_TODOS;
             }
-        } catch (CmdLineException e) {
-            System.err.println(e.getMessage());
-            parser.printUsage(System.err);
-            returnCode = TodoCheckerReturnCode.INCORRECT_CLI_ARG;
         } catch (RestClientException e) {
             if (e.getMessage().contains("Client response status: 401")) {
-                System.err.println(
-                        "NOTE: for Cloud Jenkins, you will need to create an API key for your\n" +
-                                "      account and pass that as your password.\n" +
-                                "      Visit https://id.atlassian.com/manage/api-tokens");
+                log.error(
+                        "NOTE: for Cloud Jenkins, you will need to create an API key for your account " +
+                        "and pass that as your password.  Visit https://id.atlassian.com/manage/api-tokens"
+                );
             }
-            throw e;
+            log.error("Unexpected RestClientException", e);
+            returnCode = TodoCheckerReturnCode.ERROR;
+        } catch (Exception e) {
+            log.error("Unexpected Exception", e);
+            returnCode = TodoCheckerReturnCode.ERROR;
         }
 
         System.exit(returnCode.getValue());
     }
 
-    private boolean run() throws Exception {
-        // We have to provide the default ourselves for the invalidCardStatuses, see comment by the @Option.
-        if (invalidCardStatuses == null) {
-            invalidCardStatuses = DEFAULT_INVALID_CARD_STATUSES;
+    /**
+     * Manually construct the TodoCheckerApp via dependency injection
+     */
+    private static TodoCheckerApp todoCheckerApp(TodoCheckerConfig config) throws URISyntaxException {
+        JiraClient jiraClient = new JiraClient(config);
+
+        ArrayList<Reporter> reporters = new ArrayList<>();
+        if (config.reportFile != null) {
+            reporters.add(new FileReporter(Paths.get(config.reportFile), jiraClient));
         }
-        log.info(String.join(", ", invalidCardStatuses));
-        this.jiraClient = new JiraClient(this);
-
-        if (!writeToJira) {
-            log.info("This script will not write to JIRA unless you pass '--write-to-jira' " +
-                     "as a command-line argument");
+        if (config.slackChannel != null) {
+            reporters.add(new SlackReporter(new SlackClient(config), jiraClient));
         }
+        JiraCommenter jiraCommenter = new JiraCommenter(config, jiraClient);
 
-        log.info("Connected to JIRA, server build number = {}", jiraClient.getServerInfo().getBuildNumber());
-
-        List<CodeTodo> allTodos = this.srcDirs.stream()
-            .flatMap(srcDir -> {
-                try {
+        List<TodoFinder> todoFinders = config.srcDirs.stream().map(
+                srcDir -> {
                     File srcDirFile = new File(srcDir);
                     checkArgument(srcDirFile.isDirectory(), "Invalid --src argument: " + srcDir);
-                    log.info("Scanning {}", srcDirFile.getAbsolutePath());
-                    GitCheckout gitCheckout = new GitCheckout(srcDirFile, this);
-
-                    return new TodoFinder(gitCheckout)
-                        .findAllTodosInSource(this.excludePathRegex)
-                        .stream();
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            })
-            .collect(Collectors.toList());
-
-        log.info("{} code TODOs found", allTodos.size());
-        log.debug(Joiner.on("\n").join(allTodos));
-
-        Multimap<Issue, CodeTodo> todosByIssue = groupTodosByJiraIssue(allTodos);
-
-        new JiraCommenter(this, jiraClient)
-            .updateJiraComments(todosByIssue);
-
-        boolean success = findTodosOnClosedCards(todosByIssue, jiraClient);
-        success &= findTodosWithoutACardNumber(todosByIssue);
-
-        String errorReportContent = errorReport.toString();
-        if (reportFile != null) {
-            Files.write(Paths.get(reportFile), errorReportContent.getBytes(StandardCharsets.UTF_8));
-        }
-
-        if (slackChannel != null) {
-            SlackClient slackClient = new SlackClient(this);
-            if (success) {
-                slackClient.postMessage(
-                    ":white_check_mark: TODO Checker successful: no TODOs without JIRA cards or TODOs on closed cards."
-                );
-            } else {
-                slackClient.postMessage(
-                    ":x: TODO Checker failed \n" + errorReportContent
-                );
-            }
-        }
-
-        return success;
-    }
-
-    /**
-     * Sort the list into a multimap from JiraCard to CodeTodos.
-     * <p>
-     * Any CodeTodos with no card will be included at the "null" key.
-     * <p>
-     * Any CodeTodos against ignored projects will not be returned
-     */
-    private Multimap<Issue, CodeTodo> groupTodosByJiraIssue(List<CodeTodo> allTodos) throws Exception {
-        HashMultimap<Issue, CodeTodo> acc = HashMultimap.create();
-
-        List<Pattern> jiraProjectPatterns = jiraProjects.stream()
-            .map(JiraProject::getIssueIdPattern)
-            .collect(Collectors.toList());
-        List<Pattern> ignoredJiraProjectPatterns = ignoredJiraProjects.stream()
-            .map(JiraProject::getIssueIdPattern)
-            .collect(Collectors.toList());
-
-        outer:
-        for (CodeTodo codeTodo : allTodos) {
-            String id = null;
-            // Check if the item matches a jira project
-            for (int i = 0; i < jiraProjects.size(); i++) {
-                Matcher matcher = jiraProjectPatterns.get(i).matcher(codeTodo.getLine());
-                if (matcher.find()) {
-                    String idGroup = matcher.group("id");
-                    checkNotNull(idGroup);
-                    id = jiraProjects.get(i).getKey() + "-" + idGroup;
-                    break;
-                }
-            }
-            // Else check if it matches an ignored jira project
-            if (id == null) {
-                for (Pattern pattern : ignoredJiraProjectPatterns) {
-                    Matcher matcher = pattern.matcher(codeTodo.getLine());
-                    if (matcher.find()) {
-                        log.debug("Ignoring code TODO against {}: {}", matcher.group(), codeTodo);
-                        continue outer;
+                    GitCheckout gitCheckout;
+                    try {
+                        gitCheckout = new GitCheckout(srcDirFile, config);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
                     }
-                }
-            }
+                    return new TodoFinder(gitCheckout);
+                })
+                .collect(Collectors.toList());
 
-            // Now add it to the multimap
-            if (id != null) {
-                if (null == restrictToSingleCardId || id.equals(restrictToSingleCardId)) {
-                    Issue issue = jiraClient.getIssue(id);
-                    acc.put(issue, codeTodo);
-                }
-            } else {
-                if (null == restrictToSingleCardId) {
-                    acc.put(null, codeTodo);
-                }
-            }
-        }
-
-        return acc;
+        return new TodoCheckerApp(config, jiraClient, reporters, jiraCommenter, todoFinders);
     }
 
-    private boolean findTodosOnClosedCards(
-        Multimap<Issue, CodeTodo> todosByIssue,
-        JiraClient jiraClient)
-        throws Exception {
-
-        boolean ok = true;
-        for (Map.Entry<Issue, Collection<CodeTodo>> entry : todosByIssue.asMap().entrySet()) {
-            Issue issue = entry.getKey();
-            if (issue == null) {
-                continue;
-            }
-
-            Resolution resolution = issue.getResolution();
-            if (resolution != null) {
-                logAndReportError("TODOs on a resolved '%s' JIRA card found %s",
-                                  resolution.getName(),
-                                  jiraClient.getViewUrl(issue));
-                for (CodeTodo codeTodo : entry.getValue()) {
-                    logAndReportError("  %s:%s %s",
-                                      codeTodo.getFile(),
-                                      codeTodo.getLineNumber(),
-                                      codeTodo.getLine());
-                }
-                ok = false;
-            }
-
-            if (invalidCardStatuses.contains(issue.getStatus().getName())) {
-                    logAndReportError("TODOs on a JIRA card with status '%s': %s",
-                                      issue.getStatus().getName(),
-                                      jiraClient.getViewUrl(issue));
-                    for (CodeTodo codeTodo : entry.getValue()) {
-                        logAndReportError("  %s:%s %s",
-                                          codeTodo.getFile(),
-                                          codeTodo.getLineNumber(),
-                                          codeTodo.getLine());
-                    }
-                    ok = false;
-            }
-        }
-        return ok;
-    }
-
-    private boolean findTodosWithoutACardNumber(Multimap<Issue, CodeTodo> todosByIssue) {
-        Collection<CodeTodo> codeTodos = todosByIssue.get(null);
-        if (codeTodos.isEmpty()) {
-            return true;
-        }
-        logAndReportError("TODOs without a JIRA card found:");
-        for (CodeTodo codeTodo : codeTodos) {
-            logAndReportError("  %s:%s %s",
-                              codeTodo.getFile(),
-                              codeTodo.getLineNumber(),
-                              codeTodo.getLine());
-        }
-        return false;
-    }
-
-    private void logAndReportError(String formatString, Object... args) {
-        String error = String.format(formatString, args);
-        log.error(error);
-        errorReport.append(error).append('\n');
-    }
-
-    @Override
-    public String getJobName() {
-        return jobName;
-    }
-
-    @Override
-    public String getRestrictToSingleCardId() {
-        return restrictToSingleCardId;
-    }
-
-    @Override
-    public boolean getWriteToJira() {
-        return writeToJira;
-    }
-
-    @Override
-    public List<JiraProject> getJiraProjects() {
-        return jiraProjects;
-    }
-
-    @Override
-    public String getGithubUrl() {
-        return githubUrl;
-    }
-
-    @Override
-    public String getJiraUrl() {
-        return jiraUrl;
-    }
-
-    @Override
-    public String getGitblitUrl() {
-        return gitblitUrl;
-    }
-
-    @Override
-    public String getJiraUsername() {
-        return jiraUsername;
-    }
-
-    @Override
-    public String getJiraPassword() {
-        return jiraPassword;
-    }
-
-    @Override
-    public String getSlackChannel() {
-        return slackChannel;
-    }
-
-    @Override
-    public String getSlackToken() {
-        return slackToken;
-    }
 }
