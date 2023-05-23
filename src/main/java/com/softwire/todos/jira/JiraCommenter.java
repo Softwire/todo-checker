@@ -5,13 +5,11 @@ import com.atlassian.jira.rest.client.api.domain.Issue;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import com.softwire.todos.CodeTodo;
+import com.softwire.todos.JiraIssueReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -48,10 +46,15 @@ public class JiraCommenter {
     /**
      * Update all the JIRA card comments about TODOs.
      */
-    public void updateJiraComments(Multimap<Issue, CodeTodo> todosByIssue) throws Exception {
+    public void updateJiraComments(Multimap<JiraIssueReference, CodeTodo> todosByIssue) throws Exception {
         // 1. For all cards with current TODOs, update or create a comment
-        for (Map.Entry<Issue, Collection<CodeTodo>> entry : todosByIssue.asMap().entrySet()) {
-            Issue issue = entry.getKey();
+        for (Map.Entry<JiraIssueReference, Collection<CodeTodo>> entry : todosByIssue.asMap().entrySet()) {
+            JiraIssueReference issueReference = entry.getKey();
+            if (issueReference == null) {
+                continue;
+            }
+
+            Issue issue = issueReference.getIssue();
             if (issue == null) {
                 continue;
             }
@@ -85,15 +88,18 @@ public class JiraCommenter {
         Set<Issue> issuesWithTodoComments =
                 jiraClient.searchIssuesWithComments(commentSearchJql);
 
+        Set<Issue> referencedJiraIssues = todosByIssue.asMap().keySet().stream()
+                .filter(Objects::nonNull)
+                .map(JiraIssueReference::getIssue)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        issuesWithTodoComments.removeAll(referencedJiraIssues);
+
         for (Issue issue : issuesWithTodoComments) {
-
-            // (Issue.equals works correctly here, see BasicIssue#equals)
-            if (!todosByIssue.containsKey(issue)) {
-
-                Comment todoComment = findTodoComment(issue);
-                if (todoComment != null) {
-                    jiraClient.deleteComment(issue, todoComment);
-                }
+            Comment todoComment = findTodoComment(issue);
+            if (todoComment != null) {
+                jiraClient.deleteComment(issue, todoComment);
             }
         }
     }
