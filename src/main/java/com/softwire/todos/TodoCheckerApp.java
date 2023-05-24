@@ -1,5 +1,6 @@
 package com.softwire.todos;
 
+import com.atlassian.jira.rest.client.api.RestClientException;
 import com.atlassian.jira.rest.client.api.domain.Issue;
 import com.atlassian.jira.rest.client.api.domain.Resolution;
 import com.google.common.base.Joiner;
@@ -13,10 +14,8 @@ import com.softwire.todos.reporter.Reporter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.io.IOException;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -131,8 +130,12 @@ public class TodoCheckerApp {
                     Issue issue = null;
                     try {
                         issue = jiraClient.getIssue(id);
-                    } catch (Exception e) {
-                        if (e.getMessage().contains("Unable to fetch issue")) {
+                    } catch (IOException e) {
+                        if (null != e.getCause()
+                                && e.getCause().getCause() instanceof RestClientException
+                                && ((RestClientException) e.getCause().getCause()).getStatusCode().isPresent()
+                                && ((RestClientException) e.getCause().getCause()).getStatusCode().get() == (404)
+                        ) {
                             log.warn("Could not find issue {}", id);
                         } else {
                             throw e;
