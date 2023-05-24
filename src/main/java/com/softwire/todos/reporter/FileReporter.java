@@ -1,7 +1,10 @@
 package com.softwire.todos.reporter;
 
 import com.softwire.todos.CodeTodo;
-import com.softwire.todos.errors.*;
+import com.softwire.todos.errors.TodoCheckerErrors;
+import com.softwire.todos.errors.WithInvalidStatusError;
+import com.softwire.todos.errors.WithResolvedCardError;
+import com.softwire.todos.errors.WithoutCardError;
 import com.softwire.todos.jira.JiraClient;
 
 import java.nio.charset.StandardCharsets;
@@ -43,13 +46,8 @@ public class FileReporter implements Reporter {
             appendCodeTodoDetails(error.getCodeTodos(), report);
         }
 
-        for (WithoutCardError error : errors.getWithoutCardErrors()) {
+        for (WithoutCardError error: errors.getWithoutCardErrors()) {
             report.append("TODOs without a JIRA card found:\n");
-            appendCodeTodoDetails(error.getCodeTodos(), report);
-        }
-
-        for (WithNonExistentCardError error : errors.getWithNonExistentCardErrors()) {
-            report.append("TODOs on a non-existent JIRA card found:\n");
             appendCodeTodoDetails(error.getCodeTodos(), report);
         }
 

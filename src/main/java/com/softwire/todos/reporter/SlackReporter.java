@@ -1,7 +1,10 @@
 package com.softwire.todos.reporter;
 
 import com.softwire.todos.CodeTodo;
-import com.softwire.todos.errors.*;
+import com.softwire.todos.errors.TodoCheckerErrors;
+import com.softwire.todos.errors.WithInvalidStatusError;
+import com.softwire.todos.errors.WithResolvedCardError;
+import com.softwire.todos.errors.WithoutCardError;
 import com.softwire.todos.jira.JiraClient;
 import com.softwire.todos.slack.SlackClient;
 import com.softwire.todos.slack.SlackClientException;
@@ -67,15 +70,6 @@ public class SlackReporter implements Reporter {
             messagesPosted += 1;
 
             reportError(error.getCodeTodos(), ":x: TODOs without a JIRA card found:\n");
-        }
-
-        for (WithNonExistentCardError error: errors.getWithNonExistentCardErrors()) {
-            if (tooManyMessages(messagesPosted)) {
-                return;
-            }
-            messagesPosted += 1;
-
-            reportError(error.getCodeTodos(), ":x: TODOs on a non-existent JIRA card found:\n");
         }
     }
 
