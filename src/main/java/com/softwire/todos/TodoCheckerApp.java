@@ -100,8 +100,6 @@ public class TodoCheckerApp {
             .map(JiraProject::getIssueIdPattern)
             .collect(Collectors.toList());
 
-        Map<String, JiraIssueReference> issueReferencesByKey = new HashMap<>();
-
         outer:
         for (CodeTodo codeTodo : allTodos) {
             String id = null;
@@ -129,26 +127,21 @@ public class TodoCheckerApp {
             // Now add it to the multimap
             if (id != null) {
                 if (null == config.getRestrictToSingleCardId() || id.equals(config.getRestrictToSingleCardId())) {
-                    JiraIssueReference issueReference = issueReferencesByKey.get(id);
-                    if (issueReference == null) {
-                        Issue issue = null;
-                        try {
-                            issue = jiraClient.getIssue(id);
-                        } catch (IOException e) {
-                            if (null != e.getCause()
-                                    && e.getCause().getCause() instanceof RestClientException
-                                    && ((RestClientException) e.getCause().getCause()).getStatusCode().isPresent()
-                                    && ((RestClientException) e.getCause().getCause()).getStatusCode().get() == (404)
-                            ) {
-                                log.warn("Could not find issue {}", id);
-                            } else {
-                                throw e;
-                            }
+                    Issue issue = null;
+                    try {
+                        issue = jiraClient.getIssue(id);
+                    } catch (IOException e) {
+                        if (null != e.getCause()
+                                && e.getCause().getCause() instanceof RestClientException
+                                && ((RestClientException) e.getCause().getCause()).getStatusCode().isPresent()
+                                && ((RestClientException) e.getCause().getCause()).getStatusCode().get() == (404)
+                        ) {
+                            log.warn("Could not find issue {}", id);
+                        } else {
+                            throw e;
                         }
-                        issueReference = new JiraIssueReference(id, issue);
-                        issueReferencesByKey.put(id, issueReference);
                     }
-                    acc.put(issueReference, codeTodo);
+                    acc.put(new JiraIssueReference(id, issue), codeTodo);
                 }
             } else {
                 if (null == config.getRestrictToSingleCardId()) {
