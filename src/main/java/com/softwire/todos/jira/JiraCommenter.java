@@ -5,6 +5,7 @@ import com.atlassian.jira.rest.client.api.domain.Issue;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import com.softwire.todos.CodeTodo;
+import com.softwire.todos.JiraIssueReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,10 +49,10 @@ public class JiraCommenter {
     /**
      * Update all the JIRA card comments about TODOs.
      */
-    public void updateJiraComments(Multimap<Issue, CodeTodo> todosByIssue) throws Exception {
+    public void updateJiraComments(Multimap<JiraIssueReference, CodeTodo> todosByIssue) throws Exception {
         // 1. For all cards with current TODOs, update or create a comment
-        for (Map.Entry<Issue, Collection<CodeTodo>> entry : todosByIssue.asMap().entrySet()) {
-            Issue issue = entry.getKey();
+        for (Map.Entry<JiraIssueReference, Collection<CodeTodo>> entry : todosByIssue.asMap().entrySet()) {
+            Issue issue = entry.getKey().getIssue();
             if (issue == null) {
                 continue;
             }

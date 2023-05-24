@@ -1,14 +1,12 @@
 package com.softwire.todos;
 
+import com.atlassian.jira.rest.client.api.RestClientException;
 import com.atlassian.jira.rest.client.api.domain.Issue;
 import com.atlassian.jira.rest.client.api.domain.Resolution;
 import com.google.common.base.Joiner;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
-import com.softwire.todos.errors.TodoCheckerErrors;
-import com.softwire.todos.errors.WithInvalidStatusError;
-import com.softwire.todos.errors.WithResolvedCardError;
-import com.softwire.todos.errors.WithoutCardError;
+import com.softwire.todos.errors.*;
 import com.softwire.todos.jira.JiraClient;
 import com.softwire.todos.jira.JiraCommenter;
 import com.softwire.todos.jira.JiraProject;
@@ -16,10 +14,8 @@ import com.softwire.todos.reporter.Reporter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.io.IOException;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -71,13 +67,14 @@ public class TodoCheckerApp {
         log.info("{} code TODOs found", allTodos.size());
         log.debug(Joiner.on("\n").join(allTodos));
 
-        Multimap<Issue, CodeTodo> todosByIssue = groupTodosByJiraIssue(allTodos);
+        Multimap<JiraIssueReference, CodeTodo> todosByIssue = groupTodosByJiraIssue(allTodos);
 
         jiraCommenter.updateJiraComments(todosByIssue);
 
         TodoCheckerErrors errors = TodoCheckerErrors.empty();
         findTodosOnClosedCards(todosByIssue, errors);
         findTodosWithoutACardNumber(todosByIssue, errors);
+        findTodosWithNonExistentIssues(todosByIssue, errors);
 
         for (Reporter reporter : reporters) {
             reporter.report(errors);
@@ -93,8 +90,8 @@ public class TodoCheckerApp {
      * <p>
      * Any CodeTodos against ignored projects will not be returned
      */
-    private Multimap<Issue, CodeTodo> groupTodosByJiraIssue(List<CodeTodo> allTodos) throws Exception {
-        HashMultimap<Issue, CodeTodo> acc = HashMultimap.create();
+    private Multimap<JiraIssueReference, CodeTodo> groupTodosByJiraIssue(List<CodeTodo> allTodos) throws Exception {
+        HashMultimap<JiraIssueReference, CodeTodo> acc = HashMultimap.create();
 
         List<Pattern> jiraProjectPatterns = config.getJiraProjects().stream()
             .map(JiraProject::getIssueIdPattern)
@@ -130,8 +127,21 @@ public class TodoCheckerApp {
             // Now add it to the multimap
             if (id != null) {
                 if (null == config.getRestrictToSingleCardId() || id.equals(config.getRestrictToSingleCardId())) {
-                    Issue issue = jiraClient.getIssue(id);
-                    acc.put(issue, codeTodo);
+                    Issue issue = null;
+                    try {
+                        issue = jiraClient.getIssue(id);
+                    } catch (IOException e) {
+                        if (null != e.getCause()
+                                && e.getCause().getCause() instanceof RestClientException
+                                && ((RestClientException) e.getCause().getCause()).getStatusCode().isPresent()
+                                && ((RestClientException) e.getCause().getCause()).getStatusCode().get() == (404)
+                        ) {
+                            log.warn("Could not find issue {}", id);
+                        } else {
+                            throw e;
+                        }
+                    }
+                    acc.put(new JiraIssueReference(id, issue), codeTodo);
                 }
             } else {
                 if (null == config.getRestrictToSingleCardId()) {
@@ -144,11 +154,11 @@ public class TodoCheckerApp {
     }
 
     private void findTodosOnClosedCards(
-            Multimap<Issue, CodeTodo> todosByIssue,
+            Multimap<JiraIssueReference, CodeTodo> todosByIssue,
             TodoCheckerErrors errors) {
 
-        for (Map.Entry<Issue, Collection<CodeTodo>> entry : todosByIssue.asMap().entrySet()) {
-            Issue issue = entry.getKey();
+        for (Map.Entry<JiraIssueReference, Collection<CodeTodo>> entry : todosByIssue.asMap().entrySet()) {
+            Issue issue = entry.getKey().getIssue();
             if (issue == null) {
                 continue;
             }
@@ -177,7 +187,7 @@ public class TodoCheckerApp {
     }
 
     private void findTodosWithoutACardNumber(
-            Multimap<Issue, CodeTodo> todosByIssue,
+            Multimap<JiraIssueReference, CodeTodo> todosByIssue,
             TodoCheckerErrors errors) {
         Collection<CodeTodo> codeTodos = todosByIssue.get(null);
         if (codeTodos.isEmpty()) {
@@ -189,8 +199,27 @@ public class TodoCheckerApp {
         errors.getWithoutCardErrors().add(new WithoutCardError(codeTodos));
     }
 
+    private void findTodosWithNonExistentIssues(
+            Multimap<JiraIssueReference, CodeTodo> todosByIssue,
+            TodoCheckerErrors errors) {
+        Collection<CodeTodo> codeTodos = todosByIssue.asMap().entrySet().stream()
+                .filter(e -> null != e.getKey().getId() && null == e.getKey().getIssue())
+                .map(Map.Entry::getValue)
+                .flatMap(Collection::stream)
+                .collect(Collectors.toList());
+
+        if (codeTodos.isEmpty()) {
+            return;
+        }
+
+        log.error("TODOs referencing non-existent JIRA cards found");
+        logTodos(codeTodos);
+        errors.getWithNonExistentCardErrors().add(new WithNonExistentCardError(codeTodos));
+    }
+
+
     private void logTodos(Collection<CodeTodo> entry) {
-        for (CodeTodo error: entry) {
+        for (CodeTodo error : entry) {
             log.error(String.format("   %s:%s %s", error.getPosixPath(), error.getLineNumber(), error.getLine()));
         }
     }
