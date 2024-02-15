@@ -21,7 +21,7 @@ public class JiraProject {
 
     public Pattern getIssueIdPattern() {
         return Pattern.compile(
-            "\\b(" + getRegex() + ")[-_:](?<id>[0-9]+)",
+            "todo.*\\b(" + getRegex() + ")[-_:](?<id>[0-9]+)",
             Pattern.CASE_INSENSITIVE);
     }
 }
