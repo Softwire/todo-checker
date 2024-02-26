@@ -113,6 +113,7 @@ public class JiraCommenter {
                 commentPreamble,
                 value.stream()
                         .map(this::commentText)
+                        .sorted()
                         .collect(Collectors.joining("\n")));
     }
 
