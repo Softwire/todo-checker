@@ -9,9 +9,9 @@ import com.slack.api.model.block.composition.MarkdownTextObject;
 import static java.util.Arrays.asList;
 
 public class SlackClient {
-    // The maximum message length of a Slack message is 40K chars
-    // https://api.slack.com/methods/chat.postMessage#truncating
-    private static final int MAX_MESSAGE_LENGTH = 40_000;
+    // The maximum message length of a __markdown__ Slack message is 2,958 chars
+    // https://stackoverflow.com/a/77787218
+    private static final int MAX_MESSAGE_LENGTH = 2_958;
     private static final String TRUNCATION_WARNING =
             "\nThis message was too long for the Slack API and has been truncated.";
 
