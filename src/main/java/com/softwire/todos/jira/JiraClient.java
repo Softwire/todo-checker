@@ -81,7 +81,7 @@ public class JiraClient {
                     .addComment(issue.getCommentsUri(), comment)
                     .get();
         } else {
-            log.info("Not adding comment to {}:\n{}", issue.getKey(), comment.getBody());
+            log.info("Dry-run mode: Would have added comment to {}:\n{}", issue.getKey(), comment.getBody());
         }
     }
 
@@ -93,7 +93,7 @@ public class JiraClient {
                     .updateComment(comment)
                     .get();
         } else {
-            log.info("Not updating comment on {}:\n{}", issue.getKey(), comment.getBody());
+            log.info("Dry-run mode: Would have updated comment on {}:\n{}", issue.getKey(), comment.getBody());
         }
     }
 
@@ -105,7 +105,7 @@ public class JiraClient {
                     .deleteComment(comment)
                     .get();
         } else {
-            log.info("Not deleting comment to {}:\n{}", issue.getKey(), comment.getBody());
+            log.info("Dry-run mode: Would have deleted comment on {}:\n{}", issue.getKey(), comment.getBody());
         }
     }
 

@@ -42,7 +42,9 @@ public class JiraCommenter {
                 .map(jiraProject -> "project = " + jiraProject.getKey())
                 .collect(Collectors.joining(" OR "));
 
-        commentSearchJql = String.format("(%s) AND comment ~ \"%s\"", projects, commentPreamble);
+        // See https://confluence.atlassian.com/jirasoftwareserver/search-syntax-for-text-fields-939938747.html
+        // "~" search is substring match, if the phrase is in quotes
+        commentSearchJql = String.format("(%s) AND comment ~ \"\\\"%s\\\"\"", projects, commentPreamble);
     }
 
     /**
