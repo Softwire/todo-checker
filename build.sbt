@@ -2,15 +2,21 @@ javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
 
 libraryDependencies ++= {
 
-  // https://github.com/sbt/sbt/issues/3618
-  sys.props += "packaging.type" -> "jar"
-
   Seq(
     "ch.qos.logback" % "logback-classic" % "1.1.3",
 
-    "com.atlassian.jira" % "jira-rest-java-client-app" % "5.2.2-rtb"
+    // You may be tempted to update this client, as Atlassian have published versions
+    // much newer than 5. However:
+    //  = The Atlassian client this is forked from is for the non-Cloud version of Jira
+    //  = The client this is forked from does not support comment updating, which we need
+    //    and which we added to the fork
+    // Despite the age, it's going to be easier to update our fork.
+    // This does mean we'll need to stick to old version of Java. qq
+    // The main alternative would be to start again with an OpenAPI client,
+    // as per https://community.atlassian.com/forums/Jira-articles/Generating-a-REST-client-for-Jira-Cloud/ba-p/1307133
+    "com.atlassian.jira" % "jira-rest-java-client-app" % "5.2.2025-rtb"
       notTransitive()
-      from "https://richardbradley.github.io/jira-rest-java-client/releases/jira-rest-java-client-app-5.2.2-rtb-jar-with-dependencies.jar",
+      from "https://richardbradley.github.io/jira-rest-java-client/releases/jira-rest-java-client-app-5.2.2025-rtb-jar-with-dependencies.jar",
     "com.slack.api" % "slack-api-client" % "1.27.3",
     "args4j" % "args4j" % "2.33",
     "junit" % "junit" % "4.4" % Test,

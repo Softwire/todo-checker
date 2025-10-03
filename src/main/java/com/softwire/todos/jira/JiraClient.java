@@ -113,6 +113,15 @@ public class JiraClient {
         SearchResult searchResult = restClient.getSearchClient()
                 .searchJql(jql, 1000, null, ImmutableSet.of("comment", "status")).get();
 
+        if (!searchResult.isLast()) {
+            // If this occurs, it means we can't fetch all matching Issues in one page.
+            // You'll need to either extend this app (and possibly the rest client lib) to
+            // support pagination, or accept that some TODO comments will not get removed
+            // when the TODO is fixed.
+            // This is unlikely and should be self healing as the TODOs get fixed, so just warn:
+            log.warn("Too many results from JIRA query: consider adding pagination");
+        }
+
         Set<Issue> issues = new LinkedHashSet<>();
         for (Issue issue : searchResult.getIssues()) {
             if (config.getRestrictToSingleCardId() == null || issue.getKey().equals(config.getRestrictToSingleCardId())) {
