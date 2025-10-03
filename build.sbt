@@ -1,3 +1,5 @@
+// It might be possible to update this, but there's probably
+// no need, and it might break some users, so I've left it for now.
 javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
 
 libraryDependencies ++= {
@@ -11,7 +13,6 @@ libraryDependencies ++= {
     //  = The client this is forked from does not support comment updating, which we need
     //    and which we added to the fork
     // Despite the age, it's going to be easier to update our fork.
-    // This does mean we'll need to stick to old version of Java. qq
     // The main alternative would be to start again with an OpenAPI client,
     // as per https://community.atlassian.com/forums/Jira-articles/Generating-a-REST-client-for-Jira-Cloud/ba-p/1307133
     "com.atlassian.jira" % "jira-rest-java-client-app" % "5.2.2025-rtb"
