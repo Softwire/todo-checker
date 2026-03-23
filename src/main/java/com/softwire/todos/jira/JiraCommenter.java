@@ -8,6 +8,7 @@ import com.softwire.todos.CodeTodo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -84,8 +85,7 @@ public class JiraCommenter {
 
         // 2. For any cards with a previous TODOs comment that no longer has
         // any todos, delete it:
-        Set<Issue> issuesWithTodoComments =
-                jiraClient.searchIssuesWithComments(commentSearchJql);
+        Set<Issue> issuesWithTodoComments = findAllIssuesWithTodoComments();
 
         for (Issue issue : issuesWithTodoComments) {
 
@@ -98,6 +98,13 @@ public class JiraCommenter {
                 }
             }
         }
+    }
+
+    /**
+     * If {@link com.softwire.todos.jira.JiraClient.Config#getRestrictToSingleCardId} is set, only that issue will be returned
+     */
+    public Set<Issue> findAllIssuesWithTodoComments() throws Exception {
+        return jiraClient.searchIssuesByJql(commentSearchJql);
     }
 
     private String createCommentText(Collection<CodeTodo> value) {
@@ -138,7 +145,7 @@ public class JiraCommenter {
         //
         // See https://jira.atlassian.com/browse/JRACLOUD-69992 (now closed)
         if (jiraClient.getServerInfo().getBuildNumber() > 100000) {
-            log.debug("This looks like a Cloud Jenkins, we cannot link inside code");
+            log.debug("This looks like a Cloud Jenkins, using new comment style with view link outside code block");
             return String.format(
                     "* [(view)|%s] {{%s:%s}}",
                     linkUrl,
@@ -153,11 +160,18 @@ public class JiraCommenter {
         }
     }
 
-    private Comment findTodoComment(Issue issue) {
-        return Iterables.tryFind(
-                issue.getComments(),
-                (Comment c) -> c.getBody().startsWith(commentPreamble))
-                .orNull();
+    @Nullable
+    public Comment findTodoComment(Issue issue) {
+        Comment found = null;
+        for (Comment comment : issue.getComments()) {
+            if (comment.getBody().startsWith(commentPreamble)) {
+                if (found != null) {
+                    throw new IllegalStateException("Found more than one TODO comment on issue " + issue.getKey());
+                }
+                found = comment;
+            }
+        }
+        return found;
     }
 
     public interface Config {

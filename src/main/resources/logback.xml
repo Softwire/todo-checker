@@ -11,8 +11,10 @@
 
     <logger name="com.softwire" level="INFO"/>
 
+    <!-- Set DEBUG here for HTTP logging -->
+    <logger name="org.apache.http.wire" level="INFO"/>
     <logger name="com.gargoylesoftware" level="INFO"/>
-    <logger name="org.eclipse.jetty" level="WARN"/>
+    <logger name="org.eclipse.jetty" level="INFO"/>
     <logger name="io.dropwizard" level="WARN"/>
     <logger name="org.elasticsearch" level="WARN"/>
     <logger name="liquibase" level="WARN"/>

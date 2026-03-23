@@ -18,9 +18,6 @@ public class TodoCheckerConfig implements JiraClient.Config, JiraCommenter.Confi
             usage = "Unless this is set, no changes will be made in JIRA")
     public boolean writeToJira = false;
 
-    /**
-     * If this is set, only the specified card will be acted on
-     */
     @Option(name = "--only-card",
             usage = "Set this to a JIRA card id to only operate on that one card.")
     public String restrictToSingleCardId = null;
@@ -76,7 +73,6 @@ public class TodoCheckerConfig implements JiraClient.Config, JiraCommenter.Confi
             usage = "The password of the Jira user who will comment on Jira tickets",
             required = true)
     public String jiraPassword;
-
 
     // args4j doesn't provide a way to default a multivalued field: if you provide a default here then any further
     // values from CLI arguments be added to the field, rather than replacing it.  Hence, we have to do the defaulting

@@ -69,7 +69,7 @@ public class TodoCheckerMain {
     /**
      * Manually construct the TodoCheckerApp via dependency injection
      */
-    private static TodoCheckerApp todoCheckerApp(TodoCheckerConfig config) throws URISyntaxException {
+    private static TodoCheckerApp todoCheckerApp(TodoCheckerConfig config) throws Exception {
         JiraClient jiraClient = new JiraClient(config);
 
         ArrayList<Reporter> reporters = new ArrayList<>();

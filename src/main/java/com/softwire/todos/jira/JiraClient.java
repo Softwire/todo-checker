@@ -109,7 +109,7 @@ public class JiraClient {
         }
     }
 
-    public Set<Issue> searchIssuesWithComments(String jql) throws Exception {
+    public Set<Issue> searchIssuesByJql(String jql) throws Exception {
         SearchResult searchResult = restClient.getSearchClient()
                 .searchJql(jql, 1000, null, ImmutableSet.of("comment", "status")).get();
 
