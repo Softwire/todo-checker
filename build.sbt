@@ -36,3 +36,5 @@ resolvers ++= Seq(
 
 // Pass through the app's exit code when using `sbt run`
 trapExit := false
+
+Compile / run / mainClass := Some("com.softwire.todos.TodoCheckerMain")
