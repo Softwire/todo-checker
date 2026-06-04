@@ -11,6 +11,6 @@ The project does not have numbered releases.
 
 ## Reporting a Vulnerability
 
-Please contact Richard Bradley or Simon St John-Green at softwire
+Please contact Richard Bradley or IT Helpdesk at softwire
 
 richard.bradley@softwire.com
